@@ -13,7 +13,7 @@ class Particle:
 
     def update(self):
         #重力を加える
-        self.vy += 0.5 
+        self.vy += 0.2
         
         #空気抵抗
         self.vx *= 0.99
@@ -24,7 +24,7 @@ class Particle:
         self.y += self.vy
 
     def draw(self, screen):
-        pygame.draw.circle(screen, (255, 100, 100), (int(self.x), int(self.y)), 15)
+        pygame.draw.circle(screen, (255, 100, 100), (int(self.x), int(self.y)), 8)
 
 
 class FixedMass(Particle):
@@ -68,13 +68,18 @@ class Spring:
                          (int(self.p2.x), int(self.p2.y)), 4)
 
 
+def get_ceiling_y(x):
+    """ 指定したx座標の天井の高さを返す関数 """
+    # 今は単純に、どこでも高さ50とする
+    return 50
+
 def main():
     pygame.init()
     screen = pygame.display.set_mode((800, 600))
     clock = pygame.time.Clock()
 
     #主人公を作る
-    player = Particle(400, 300)
+    player = Particle(200, 300)
     
     #バネと支点を入れるリスト
     springs = []
@@ -83,6 +88,9 @@ def main():
     while True:
         screen.fill((200, 255, 255))
 
+        #緑色の四角で天井を描いておく
+        pygame.draw.rect(screen, (34, 139, 34), (0, 0, 800, 50))
+
         # --- イベント処理 ---
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -90,20 +98,40 @@ def main():
 
             #マウスを押した瞬間ロープ発射
             if event.type == pygame.MOUSEBUTTONDOWN:
-                mx, my = pygame.mouse.get_pos()
+                # 1. 天井の高さを調べる（今はどこでも50）
+                ceil_y = get_ceiling_y(player.x)
                 
-                #クリックした場所に支点を作る
-                anchor = FixedMass(mx, my)
-                fixed_points.append(anchor)
+                # 2. プレイヤーから天井までの距離 (高さ)
+                height_diff = player.y - ceil_y
+                
+                # 天井より上にいたら発射できない
+                if height_diff > 0:
+                    # 3. 角度計算 (50度をラジアンに変換)
+                    angle_deg = 50
+                    angle_rad = math.radians(angle_deg)
+                    
+                    # 4. 三角関数で「横にどれくらい先か(dx)」を計算
+                    # dx = 高さ * tan(角度)
+                    dx = height_diff * math.tan(angle_rad)
+                    
+                    target_x = player.x + dx
+                    
+                    # 5. 支点を作成
+                    anchor = FixedMass(target_x, ceil_y)
+                    fixed_points.append(anchor)
 
-                #現在の主人公との距離を計算
-                dx = anchor.x - player.x
-                dy = anchor.y - player.y
-                current_dist = math.sqrt(dx*dx + dy*dy)
+                    # 6. バネを作成
+                    # 距離は三平方の定理で計算 (current_dist)
+                    dist = math.sqrt(dx*dx + height_diff*height_diff)
+                    rope = Spring(player, anchor, dist, k=0.5)
+                    springs.append(rope)
 
-                #その距離でバネをつなぐ
-                rope = Spring(player, anchor, current_dist, k=0.5) 
-                springs.append(rope)
+                    # 【変更点2】ブースト（加速）機能！
+                    # ロープがついた瞬間、少しだけ速度を足してあげる
+                    # 接線方向（ロープと直角な方向）に力を加えるのが物理的に正しいですが
+                    # ここではゲーム的に「進行方向に加速」するだけでも十分です！
+                    player.vx += 4.0 
+                    player.vy -= 2.0 # 少し体を持ち上げる
 
             #マウスを離した瞬間ロープ解除
             if event.type == pygame.MOUSEBUTTONUP:
