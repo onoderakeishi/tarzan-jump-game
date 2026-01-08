@@ -1,14 +1,14 @@
-import pygame
 import math
 import random
+import pygame
 
 #定数定義
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 GRAVITY = 0.25
-ROPE_ANGLE = 50     #常に斜め50度上を狙うようにしました
-KICK_STRENGTH = 1   #ブーストの強さ
-GOAL_X = 10000      #ゴールライン
+ROPE_ANGLE = 50     #常に斜め50度上を狙うようにした
+KICK_STRENGTH = 2   #ブーストの強さ
+GOAL_X = 10000      #ゴールまでの距離
 
 #クラス定義
 class Particle:
@@ -21,10 +21,9 @@ class Particle:
         self.radius = 12
 
     def update(self):
-        #重力をかけます
-        self.vy += GRAVITY
+        self.vy += GRAVITY      #重力をかける
 
-        #ブーストで加速するときの速度上限を設けます
+        #速度制限
         speed = math.sqrt(self.vx**2 + self.vy**2)
         if speed > 18.0:
             ratio = 18.0 / speed
@@ -35,10 +34,10 @@ class Particle:
         self.y += self.vy
 
     def draw(self, screen, scroll_x):
-        draw_x = int(self.x - scroll_x)
+        draw_x = int(self.x - scroll_x)     #スクロール分を引く
         draw_y = int(self.y)
         pygame.draw.circle(screen, (255, 204, 153), (draw_x, draw_y), self.radius)
-        #目をつけて、速度の正負によって向きをわかりやすくしました
+        #目をつけて、速度の正負によって向きをわかりやすくした
         eye_offset = 5 if self.vx >= 0 else -5
         pygame.draw.circle(screen, (0,0,0), (draw_x + eye_offset, draw_y - 4), 3)
 
@@ -49,31 +48,32 @@ class Rope:
         self.anchor_x = anchor_x
         self.anchor_y = anchor_y
         self.player = player
-        
+
         #ロープの長さは、ロープがかかった瞬間の距離で固定します
         dx = player.x - anchor_x
         dy = player.y - anchor_y
         self.length = math.sqrt(dx*dx + dy*dy)
-        if self.length < 10: self.length = 10
+        if self.length < 10:
+            self.length = 10       #ロープの長さが0にならないようにする
 
     def update(self):
-        #現在の距離を測る
+        #現在のプレイヤーと支点の距離を測る
         dx = self.player.x - self.anchor_x
         dy = self.player.y - self.anchor_y
         dist = math.sqrt(dx*dx + dy*dy)
 
         #もしロープの長さより遠くに行こうとした場合
         if dist > self.length:
-            #強制的に位置を引き戻す
+            #強制的にプレイヤーの位置を引き戻す
             ratio = self.length / dist
             self.player.x = self.anchor_x + dx * ratio
             self.player.y = self.anchor_y + dy * ratio
 
-            # 2. 速度の修正（遠心力を残しつつ、引っ張られる動き）
-            nx = dx / dist
-            ny = dy / dist
-            dot = self.player.vx * nx + self.player.vy * ny
-            if dot > 0: # 外に向かう速度成分があれば消す
+            #ロープ方向の速度成分を消す
+            nx = dx / dist  #ロープ方向の単位ベクトル
+            ny = dy / dist  #ロープ方向の単位ベクトル
+            dot = self.player.vx * nx + self.player.vy * ny #内積で速度成分を計算
+            if dot > 0: #外に向かう速度成分があれば消す
                 self.player.vx -= nx * dot
                 self.player.vy -= ny * dot
 
@@ -92,14 +92,14 @@ class CeilingMap:
         self.blocks.append(pygame.Rect(-200, 0, 800, 50))
         
         #12000px先まで天井を作る
-        current_x = 600
+        current_x = 600     #最初の天井のx座標
         while current_x < 12000:
             w = random.randint(100, 350)        #ランダムに天井の幅を決める
             h = random.randint(50, 200)         #ランダムに天井の高さを決める   
             self.blocks.append(pygame.Rect(current_x, 0, w, h))
             current_x += w + random.randint(50, 200) #天井と天井の間の隙間を作る
 
-    def get_ceiling_y(self, x):
+    def get_ceiling_y(self, x):         #指定したx座標の天井のy座標を返す
         for rect in self.blocks:
             if rect.left <= x <= rect.right:
                 return rect.bottom
@@ -107,9 +107,10 @@ class CeilingMap:
 
     def draw(self, screen, scroll_x):
         for rect in self.blocks:
-            if rect.right - scroll_x < 0: continue
-            if rect.left - scroll_x > SCREEN_WIDTH: continue
-            
+            if rect.right - scroll_x < 0:
+                continue
+            if rect.left - scroll_x > SCREEN_WIDTH:
+                continue
             draw_rect = pygame.Rect(rect.x - scroll_x, rect.y, rect.width, rect.height)
             pygame.draw.rect(screen, (139, 69, 19), draw_rect) #茶色
 
@@ -120,52 +121,53 @@ class SpikeFloor:
         self.y = SCREEN_HEIGHT - 30 #下から30px
 
     def check_hit(self, player):
-        #プレイヤーの下端が床より下に行ったらアウト
+        #プレイヤーの下端がとげより下に行ったらTrue(とげに当たった判定)を返す
         if player.y + player.radius > self.y + 10:
             return True
         return False
 
     def draw(self, screen, scroll_x):
-        # ギザギザを描く
+        #ギザギザを描く
         spike_w = 30
-        start_i = int(scroll_x / spike_w)
-        end_i = start_i + int(SCREEN_WIDTH / spike_w) + 2
-        
+        start_i = int(scroll_x / spike_w)       #描き始めるのは何番目のトゲからか?
+        end_i = start_i + int(SCREEN_WIDTH / spike_w) + 2       #何番目のトゲまで描けばいいか?(予備で2個追加)
+
         for i in range(start_i, end_i):
-            base_x = i * spike_w - scroll_x
-            # ギザギザの三角形
+            base_x = i * spike_w - scroll_x     #ゲーム世界の絶対値座標-カメラ位置
+            #ギザギザの三角形
             p1 = (base_x, SCREEN_HEIGHT)
-            p2 = (base_x + spike_w/2, self.y) # トゲの先端
+            p2 = (base_x + spike_w/2, self.y)       #トゲの先端
             p3 = (base_x + spike_w, SCREEN_HEIGHT)
             pygame.draw.polygon(screen, (0, 100, 0), [p1, p2, p3])
 
-
-# --- メインクラス ---
 
 class AppMain:
     def __init__(self):
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont(None, 60)
-        self.reset_game()
-        self.state = "READY" #ゲーム開始前の状態
+        self.font = pygame.font.SysFont(None, 60)       #フォントを用意
+        self.score = 0
+        self.scroll_x = 0
+        self.rope = None
+        self.reset_game()       #ゲームオーバー後の再スタートに使えるように関数で用意
+        self.state = "READY" #クリックでスタートするので、ゲーム開始前の状態を用意
 
     def reset_game(self):
         self.ceiling = CeilingMap()
         self.spikes = SpikeFloor()
-        
-        #スタート地点の安全な場所を探す
+
+        #スタート地点の天井の高さを調べる
         start_x = 200
         ceil_y = self.ceiling.get_ceiling_y(start_x)
-        if ceil_y is None: ceil_y = 50
+        if ceil_y is None: ceil_y = 50      #もしスタート地点に天井がなかったら、高さを50にする
         
-        self.player = Particle(start_x, ceil_y + 150)
+        self.player = Particle(start_x, ceil_y + 150)       #天井から150px下に配置
         #最初からぶら下がった状態でスタート
         self.rope = Rope(start_x, ceil_y, self.player)
         
         self.scroll_x = 0
-        self.state = "PLAYING" #リセット時はPLAYINGにする
+        self.state = "PLAYING" #状態をプレイ中にする
         self.score = 0
 
     def update(self):
@@ -174,13 +176,13 @@ class AppMain:
         if key_pressed[pygame.K_ESCAPE]:
             pygame.event.post(pygame.event.Event(pygame.QUIT))
 
-        #READY状態の処理
+        #READY状態のとき、クリックされたらPLAYINGに変える
         if self.state == "READY":
             if pygame.mouse.get_pressed()[0]:
                 self.state = "PLAYING"
             return
 
-        #GAMEOVERまたはGOALの時のリスタート処理
+        #GAMEOVERまたはGOALのときのリスタート処理
         if self.state == "GAMEOVER" or self.state == "GOAL":
             if pygame.mouse.get_pressed()[0]:
                 self.reset_game()
@@ -190,34 +192,31 @@ class AppMain:
         mouse_pressed = pygame.mouse.get_pressed()[0]
         
         if mouse_pressed:
-            # まだロープがないなら、新しく発射！
+            #クリックしていて、ロープがまだない場合
             if self.rope is None:
-                # 1. 狙う場所を計算 (斜め50度)
+                #狙う場所を計算(斜め50度)
                 angle_rad = math.radians(ROPE_ANGLE)
                 dy = self.player.y - 100 # とりあえず高さ100px上を目指す
                 if dy < 10: dy = 10
-                dx = dy / math.tan(angle_rad) # 三角関数で横距離を出す
+                dx = dy / math.tan(angle_rad) # タンジェントで横距離を出す
                 target_x = self.player.x + dx
                 
-                # 2. そこに天井があるか？
+                #そこに天井があるか確認する
                 ceil_y = self.ceiling.get_ceiling_y(target_x)
                 
-                # 3. 天井があって、かつ自分より上にあったら発射成功
+                #天井があるかつ自分より上にあったら発射成功
                 if ceil_y is not None and ceil_y < self.player.y:
                     self.rope = Rope(target_x, ceil_y, self.player)
                     
-                    # 4. ブースト（加速）！【ここを修正】
-                    # ロープベクトル(diff)と直角な方向(tangent)を求める
+                    #加速させる(接線方向に力を加える)
                     diff_x = self.player.x - target_x
                     diff_y = self.player.y - ceil_y
                     dist = math.sqrt(diff_x**2 + diff_y**2)
                     
                     if dist > 0:
-                        # 直交ベクトル (-y, x) は90度回転の公式
                         tan_x = -diff_y / dist
                         tan_y = diff_x / dist
-                        
-                        # 常に「右側（進む方向）」に向くように符号調整
+                        #常に右側に向くように符号調整
                         if tan_x < 0:
                             tan_x = -tan_x
                             tan_y = -tan_y
@@ -226,23 +225,24 @@ class AppMain:
                         self.player.vy += tan_y * KICK_STRENGTH
 
         else:
-            # マウスを離したらロープ解除
+            #マウスを離したらロープ解除
             self.rope = None
 
-        # --- 物理演算 ---
+        #物理演算
         self.player.update()
         if self.rope:
             self.rope.update()
 
-        # --- 当たり判定 ---
+        #トゲに当たったらゲームオーバー
         if self.spikes.check_hit(self.player):
             self.state = "GAMEOVER"
 
-        # --- スクロール ---
+        #スクロールの処理
+        #プレイヤーが画面の左から1/3より右に行ったら、カメラも右に動かす
         target_scroll = self.player.x - SCREEN_WIDTH / 3
-        self.scroll_x += (target_scroll - self.scroll_x) * 0.1
+        self.scroll_x += (target_scroll - self.scroll_x) * 0.1      #0.1をかけて少し遅れてついてくるようにする
 
-        # スコア（進んだ距離）
+        #右に進んだ最大距離をスコアにする
         if self.player.x > self.score:
             self.score = int(self.player.x)
         
@@ -251,21 +251,21 @@ class AppMain:
             self.state = "GOAL"
 
     def draw(self):
-        self.screen.fill((135, 206, 235)) # 空色
+        self.screen.fill((135, 206, 235)) #背景は空色にする
 
         self.ceiling.draw(self.screen, self.scroll_x)
         self.spikes.draw(self.screen, self.scroll_x)
 
         #ゴールラインの描画
         goal_rect = pygame.Rect(GOAL_X - self.scroll_x, 0, 50, SCREEN_HEIGHT)
-        pygame.draw.rect(self.screen, (255, 215, 0), goal_rect) # 金色
+        pygame.draw.rect(self.screen, (255, 215, 0), goal_rect) #黄色にする
 
-        #ガイド線（プレイ中でロープを出していない時だけ表示）
+        #ガイド線(プレイ中でロープを出していない時だけ表示する)
         if self.state == "PLAYING" and self.rope is None:
-            # updateと同じ計算をして、ロープが刺さる予定地を予測
+            #今クリックしたらどこに刺さるかを、updateと同じ計算で求める
             angle_rad = math.radians(ROPE_ANGLE)
             dy = self.player.y - 100
-            if dy < 10: dy = 10
+            dy = max(dy, 10)
             dx = dy / math.tan(angle_rad)
             target_x = self.player.x + dx
             
@@ -273,22 +273,22 @@ class AppMain:
             
             start_pos = (self.player.x - self.scroll_x, self.player.y)
             
-            # 発射可能なら「水色」、無理なら「赤」
+            #発射可能なら水色、無理なら赤でガイド線を表示する
             if ceil_y is not None and ceil_y < self.player.y:
-                color = (0, 255, 255) # OK
+                color = (0, 255, 255) #発射可能
                 end_pos = (target_x - self.scroll_x, ceil_y)
             else:
-                color = (255, 0, 0) # NG
+                color = (255, 0, 0) #発射無理
                 end_pos = (target_x - self.scroll_x, self.player.y - dy)
             
             pygame.draw.line(self.screen, color, start_pos, end_pos, 2)
 
-        # キャラクター
+        #プレイヤーとロープを表示
         if self.rope:
             self.rope.draw(self.screen, self.scroll_x)
         self.player.draw(self.screen, self.scroll_x)
 
-        # UI
+        #スコアやメッセージを表示
         score_text = self.font.render(f"DIST: {self.score} / {GOAL_X}", True, (255, 255, 255))
         self.screen.blit(score_text, (20, 20))
 
