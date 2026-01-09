@@ -1,5 +1,4 @@
-#学籍番号：C4TB1051
-#氏名：小野寺啓志
+#ターザンロープアクションゲーム
 
 import math
 import random
