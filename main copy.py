@@ -66,29 +66,6 @@ class Particle:
         pygame.draw.circle(screen, (0,0,0), (draw_x + eye_offset, draw_y - 4), 3)
 
 
-class Spark:
-    """小さなパーティクル効果（ロープ接続時など）"""
-    def __init__(self, pos, vel, life=30):
-        self.pos = pygame.Vector2(pos)
-        self.vel = pygame.Vector2(vel)
-        self.life = life
-        self.max_life = life
-
-    def update(self):
-        # 軽い重力と減速
-        self.vel += pygame.Vector2(0, 0.15)
-        self.pos += self.vel
-        self.life -= 1
-
-    def draw(self, screen, scroll_x):
-        if self.life <= 0:
-            return
-        alpha = int(255 * (self.life / max(1, self.max_life)))
-        s = pygame.Surface((4, 4), pygame.SRCALPHA)
-        s.fill((255, 215, 0, alpha))
-        screen.blit(s, (int(self.pos.x - scroll_x), int(self.pos.y)))
-
-
 class Rope:
     """ ロープ"""
     def __init__(self, anchor_x, anchor_y, player, world):
@@ -192,13 +169,9 @@ class AppMain:
         self.screen = pygame.display.set_mode((self.world.width, self.world.height))
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont(None, 60)       #フォントを用意
-        self.font_small = pygame.font.SysFont(None, 24)
         self.score = 0
         self.scroll_x = 0
         self.rope = None
-        self.effects = []       # Spark 等のエフェクト
-        self.clouds = [pygame.Vector2(random.randint(0, 12000), random.randint(20, 150)) for _ in range(8)]
-        self.paused = False
         self.reset_game()       #ゲームオーバー後の再スタートに使えるように関数で用意
         self.state = "READY" #クリックでスタートするので、ゲーム開始前の状態を用意
 
@@ -214,8 +187,7 @@ class AppMain:
         self.player = Particle(start_x, ceil_y + 150, self.world)       #天井から150px下に配置
         #最初からぶら下がった状態でスタート
         self.rope = Rope(start_x, ceil_y, self.player, self.world)
-        self.effects.clear()
-        self.paused = False
+        
         self.scroll_x = 0
         self.state = "PLAYING" #状態をプレイ中にする
         self.score = 0
@@ -243,10 +215,6 @@ class AppMain:
         key_pressed = pygame.key.get_pressed()
         if key_pressed[pygame.K_ESCAPE]:
             pygame.event.post(pygame.event.Event(pygame.QUIT))
-
-        # ポーズは run() の KEYDOWN でトグルされる
-        if self.paused:
-            return
 
         #READY状態のとき、クリックされたらPLAYINGに変える
         if self.state == "READY":
@@ -285,10 +253,6 @@ class AppMain:
                             tangent =- tangent   #右向きにブーストしたいので、x成分が正になるようにする
 
                         self.player.vel += tangent * KICK_STRENGTH
-                    # 接続時の小さなエフェクト
-                    for i in range(10):
-                        vel = pygame.Vector2(random.uniform(-2, 2), random.uniform(-4, -1))
-                        self.effects.append(Spark(self.rope.anchor, vel, life=random.randint(15, 35)))
 
         else:
             #マウスを離したらロープ解除
@@ -298,15 +262,6 @@ class AppMain:
         self.player.update()
         if self.rope:
             self.rope.update()
-
-        # エフェクト更新
-        for e in list(self.effects):
-            e.update()
-            if e.life <= 0:
-                try:
-                    self.effects.remove(e)
-                except ValueError:
-                    pass
 
         #トゲに当たったらゲームオーバー
         if self.spikes.check_hit(self.player):
@@ -326,29 +281,14 @@ class AppMain:
             self.state = "GOAL"
 
     def draw(self):
-        # グラデーション風の空背景
-        for i in range(self.world.height):
-            t = i / self.world.height
-            r = int(135 * (1 - t) + 25 * t)
-            g = int(206 * (1 - t) + 25 * t)
-            b = int(235 * (1 - t) + 112 * t)
-            pygame.draw.line(self.screen, (r, g, b), (0, i), (self.world.width, i))
-
-        # パララックスクラウド
-        for c in self.clouds:
-            cx = c.x - self.scroll_x * 0.3
-            cy = c.y
-            pygame.draw.ellipse(self.screen, (255, 255, 255), (cx % (self.world.width + 200) - 100, cy, 140, 60))
+        self.screen.fill((135, 206, 235)) #背景は空色にする
 
         self.ceiling.draw(self.screen, self.scroll_x)
         self.spikes.draw(self.screen, self.scroll_x)
 
         #ゴールラインの描画
-        # ゴールを点滅させて目立たせる
-        glow = (math.sin(pygame.time.get_ticks() * 0.005) + 1) / 2
-        goal_color = (int(255 * (0.6 + 0.4 * glow)), int(215 * (0.6 + 0.4 * glow)), 0)
         goal_rect = pygame.Rect(GOAL_X - self.scroll_x, 0, 50, self.world.height)
-        pygame.draw.rect(self.screen, goal_color, goal_rect)
+        pygame.draw.rect(self.screen, (255, 215, 0), goal_rect) #黄色にする
 
         #ガイド線(プレイ中でロープを出していない時だけ表示する)
         if self.state == "PLAYING" and self.rope is None:
@@ -380,27 +320,9 @@ class AppMain:
             self.rope.draw(self.screen, self.scroll_x)
         self.player.draw(self.screen, self.scroll_x)
 
-        # エフェクト描画
-        for e in self.effects:
-            e.draw(self.screen, self.scroll_x)
-
         #スコアやメッセージを表示
         score_text = self.font.render(f"DIST: {self.score} / {GOAL_X}", True, (255, 255, 255))
         self.screen.blit(score_text, (20, 20))
-
-        # 進捗バー
-        bar_w = 300
-        bar_h = 16
-        bar_x = 20
-        bar_y = 20 + 60
-        ratio = max(0.0, min(1.0, self.player.x / max(1, GOAL_X)))
-        pygame.draw.rect(self.screen, (50, 50, 50), (bar_x, bar_y, bar_w, bar_h))
-        pygame.draw.rect(self.screen, (50, 205, 50), (bar_x, bar_y, int(bar_w * ratio), bar_h))
-        pygame.draw.rect(self.screen, (255, 255, 255), (bar_x, bar_y, bar_w, bar_h), 2)
-
-        # FPS 表示（小さなフォント）
-        fps_text = self.font_small.render(f"FPS: {int(self.clock.get_fps())}", True, (255, 255, 255))
-        self.screen.blit(fps_text, (self.world.width - 100, 10))
 
         #状態ごとのメッセージ表示
         if self.state == "READY":
@@ -421,11 +343,6 @@ class AppMain:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     return
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_p:
-                        self.paused = not self.paused
-                    if event.key == pygame.K_ESCAPE:
-                        pygame.event.post(pygame.event.Event(pygame.QUIT))
             self.update()
             self.draw()
             self.clock.tick(60)
