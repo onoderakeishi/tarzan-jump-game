@@ -163,28 +163,29 @@ class CeilingMap:
         start_rect = pygame.Rect(-200, 0, 800, 50)
         self.blocks.append({'rect': start_rect, 'attach_points': [start_rect.left + 200], 'stalactites': []})
 
-        #12000px先まで天井を作る（より複雑に）
+        #12000px先まで天井を作る（より難しく）
         current_x = 600
         while current_x < 12000:
-            w = random.randint(120, 420)
-            h = random.randint(40, 220)
+            # 小さめのブロック幅にして、隙間を広めに取る -> 難易度上昇
+            w = random.randint(80, 300)
+            h = random.randint(50, 200)
             rect = pygame.Rect(current_x, 0, w, h)
 
             # attach points: some x positions where rope can attach (avoid near edges)
             attach_points = []
-            for _ in range(random.randint(1, max(1, w // 120))):
-                ax = random.randint(rect.left + 20, rect.right - 20)
+            for _ in range(random.randint(1, max(1, w // 140))):
+                ax = random.randint(rect.left + 12, rect.right - 12)
                 attach_points.append(ax)
 
-            # stalactites: list of (x, length) relative to rect
+            # stalactites: list of (x, length) relative to rect (増加確率と長さ)
             stalactites = []
-            for sx in range(rect.left + 10, rect.right - 10, 40):
-                if random.random() < 0.25:
-                    length = random.randint(10, min(60, h - 10))
+            for sx in range(rect.left + 8, rect.right - 8, 32):
+                if random.random() < 0.40:
+                    length = random.randint(12, min(90, h - 5))
                     stalactites.append((sx, length))
 
             self.blocks.append({'rect': rect, 'attach_points': attach_points, 'stalactites': stalactites})
-            current_x += w + random.randint(30, 220)
+            current_x += w + random.randint(80, 300)
 
     def get_ceiling_y(self, x):
         for b in self.blocks:
@@ -357,13 +358,25 @@ class AppMain:
             if self.rope is None:
                 #狙う場所を計算(斜め50度)
                 target_x = self.get_rope_target()
-                # try to snap to a nearby attachable node first
-                attach = self.ceiling.get_nearest_attach(target_x)
-                if attach:
-                    ceil_y = attach[1]
-                    target_x = attach[0]
-                else:
-                    ceil_y = self.ceiling.get_ceiling_y(target_x)
+                # allow attaching anywhere on the ceiling near the aim point
+                # 1) try exact target
+                ceil_y = self.ceiling.get_ceiling_y(target_x)
+                # 2) if nothing found, probe sideways within +/-200px to find nearest ceiling above player
+                if ceil_y is None:
+                    best = None
+                    best_d = 9999
+                    probe_range = 200
+                    step = 8
+                    for dx in range(-probe_range, probe_range + 1, step):
+                        tx = target_x + dx
+                        ty = self.ceiling.get_ceiling_y(tx)
+                        if ty is not None and ty < self.player.y:
+                            d = abs(dx)
+                            if d < best_d:
+                                best_d = d
+                                best = (tx, ty)
+                    if best:
+                        target_x, ceil_y = best
                 
                 #天井があるかつ自分より上にあったら発射成功
                 if ceil_y is not None and ceil_y < self.player.y:
