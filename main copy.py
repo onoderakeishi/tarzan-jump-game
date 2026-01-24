@@ -221,19 +221,46 @@ class CeilingMap:
             if rect.left - scroll_x > self.world.width:
                 continue
             draw_rect = pygame.Rect(rect.x - scroll_x, rect.y, rect.width, rect.height)
-            pygame.draw.rect(screen, (139, 69, 19), draw_rect)
+            # base rock/wood ceiling
+            pygame.draw.rect(screen, (100, 60, 30), draw_rect)
 
-            # draw attach points
+            # add mottled highlights to give texture
+            for i in range(0, draw_rect.width, 24):
+                rx = draw_rect.x + i + (i % 12)
+                ry = draw_rect.y + (i % 6)
+                pygame.draw.ellipse(screen, (110, 70, 40), (rx, ry, 20, 8))
+
+            # draw attach points (as small mossy knobs)
             for ax in b['attach_points']:
                 px = int(ax - scroll_x)
                 py = int(rect.bottom)
-                pygame.draw.circle(screen, (50, 205, 50), (px, py), 4)
+                pygame.draw.circle(screen, (34, 139, 34), (px, py), 5)
+                pygame.draw.circle(screen, (50, 205, 50), (px, py-2), 3)
 
-            # draw stalactites
+                # small hanging vine from attach point
+                vine_len = random.randint(40, 120)
+                segs = max(4, vine_len // 10)
+                points = []
+                for si in range(segs + 1):
+                    t = si / segs
+                    vx = px + int(math.sin((px * 0.01) + si * 0.6) * 6)
+                    vy = int(py + t * vine_len)
+                    points.append((vx, vy))
+                if len(points) > 1:
+                    pygame.draw.lines(screen, (34, 100, 34), False, points, 2)
+                    # leaves along vine
+                    for li, p in enumerate(points[2::3]):
+                        lx = p[0]
+                        ly = p[1]
+                        pygame.draw.polygon(screen, (34, 139, 34), [(lx, ly), (lx-6, ly+8), (lx+6, ly+8)])
+
+            # draw stalactites (as darker green/brown tips)
             for sx, length in b['stalactites']:
                 base_x = sx - scroll_x
                 tip_y = rect.bottom + length
-                pygame.draw.polygon(screen, (120, 60, 20), [(base_x-6, rect.bottom), (base_x, tip_y), (base_x+6, rect.bottom)])
+                pygame.draw.polygon(screen, (60, 40, 20), [(base_x-6, rect.bottom), (base_x, tip_y), (base_x+6, rect.bottom)])
+                # small moss on stalactite
+                pygame.draw.circle(screen, (34, 139, 34), (int(base_x), int(rect.bottom-4)), 3)
 
 
 class SpikeFloor:
@@ -249,7 +276,7 @@ class SpikeFloor:
         return False
 
     def draw(self, screen, scroll_x):
-        #ギザギザを描く
+        #ギザギザを描く（地面にジャングルの手前植物を追加）
         spike_w = 30
         start_i = int(scroll_x / spike_w)       #描き始めるのは何番目のトゲからか?
         end_i = start_i + int(self.world.width / spike_w) + 2       #何番目のトゲまで描けばいいか?(予備で2個追加)
@@ -260,7 +287,15 @@ class SpikeFloor:
             p1 = (base_x, self.world.height)
             p2 = (base_x + spike_w/2, self.y)       #トゲの先端
             p3 = (base_x + spike_w, self.world.height)
-            pygame.draw.polygon(screen, (0, 100, 0), [p1, p2, p3])
+            pygame.draw.polygon(screen, (30, 80, 30), [p1, p2, p3])
+
+            # 手前に草やシダを描画してジャングル感を演出
+            plant_x = base_x + spike_w/2
+            plant_base_y = self.world.height
+            for j in range(3):
+                offset = j * 6
+                leaf_h = random.randint(12, 28)
+                pygame.draw.polygon(screen, (16, 120, 16), [(plant_x+offset-8, plant_base_y), (plant_x+offset, plant_base_y-leaf_h), (plant_x+offset+8, plant_base_y)])
 
 
 class AppMain:
