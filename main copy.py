@@ -67,16 +67,21 @@ class Particle:
 
 
 class Spark:
-    """小さなパーティクル効果（ロープ接続時など）"""
-    def __init__(self, pos, vel, life=30):
+    """小さなパーティクル効果（ロープ接続時など）
+    - color, size を持ちフェードアウトする。
+    """
+    def __init__(self, pos, vel, life=30, color=(255,215,0), size=4):
         self.pos = pygame.Vector2(pos)
         self.vel = pygame.Vector2(vel)
         self.life = life
         self.max_life = life
+        self.color = color
+        self.size = size
 
     def update(self):
-        # 軽い重力と減速
-        self.vel += pygame.Vector2(0, 0.15)
+        # 軽い重力と空気抵抗
+        self.vel += pygame.Vector2(0, 0.18)
+        self.vel *= 0.995
         self.pos += self.vel
         self.life -= 1
 
@@ -84,9 +89,41 @@ class Spark:
         if self.life <= 0:
             return
         alpha = int(255 * (self.life / max(1, self.max_life)))
-        s = pygame.Surface((4, 4), pygame.SRCALPHA)
-        s.fill((255, 215, 0, alpha))
-        screen.blit(s, (int(self.pos.x - scroll_x), int(self.pos.y)))
+        s = pygame.Surface((self.size*2, self.size*2), pygame.SRCALPHA)
+        r,g,b = self.color
+        s.fill((r, g, b, alpha))
+        screen.blit(s, (int(self.pos.x - scroll_x - self.size), int(self.pos.y - self.size)))
+
+
+class LeafParticle:
+    """落ちる葉のパーティクル（回転・揺れ）"""
+    def __init__(self, pos, vel, life=120, color=(60,140,60)):
+        self.pos = pygame.Vector2(pos)
+        self.vel = pygame.Vector2(vel)
+        self.life = life
+        self.max_life = life
+        self.color = color
+        self.rot = random.uniform(0, 360)
+        self.rot_speed = random.uniform(-3, 3)
+        self.size = random.randint(6, 12)
+
+    def update(self):
+        # gentle sway + gravity
+        t = pygame.time.get_ticks() * 0.001
+        self.vel.x += math.sin(t + self.pos.x * 0.01) * 0.03
+        self.vel.y += 0.06
+        self.pos += self.vel
+        self.rot += self.rot_speed
+        self.life -= 1
+
+    def draw(self, screen, scroll_x):
+        if self.life <= 0:
+            return
+        alpha = int(200 * (self.life / max(1, self.max_life)))
+        surf = pygame.Surface((self.size*2, self.size), pygame.SRCALPHA)
+        pygame.draw.ellipse(surf, (self.color[0], self.color[1], self.color[2], alpha), (0, 0, self.size*2, self.size))
+        rs = pygame.transform.rotate(surf, self.rot)
+        screen.blit(rs, (int(self.pos.x - scroll_x - rs.get_width()/2), int(self.pos.y - rs.get_height()/2)))
 
 
 class Collectible:
@@ -310,11 +347,12 @@ class AppMain:
         self.coin = 0
         self.scroll_x = 0
         self.rope = None
-        self.effects = []
+        self.particles = []
         self.collectibles = []
         self.paused = False
         self.reset_game()       #ゲームオーバー後の再スタートに使えるように関数で用意
         self.state = "READY" #クリックでスタートするので、ゲーム開始前の状態を用意
+        self.last_leaf_spawn = 0
 
     def reset_game(self):
         self.ceiling = CeilingMap(self.world)
@@ -333,7 +371,7 @@ class AppMain:
         self.state = "PLAYING" #状態をプレイ中にする
         self.score = 0
         self.coin = 0
-        self.effects.clear()
+        self.particles.clear()
 
         # collectibles を生成: 各ブロックの接続点から少し離れた位置にランダム配置
         self.collectibles = []
@@ -431,7 +469,7 @@ class AppMain:
                     # 接続時の小さなエフェクト
                     for i in range(8):
                         vel = pygame.Vector2(random.uniform(-2, 2), random.uniform(-4, -1))
-                        self.effects.append(Spark(self.rope.anchor, vel, life=random.randint(12, 28)))
+                        self.particles.append(Spark(self.rope.anchor, vel, life=random.randint(12, 28)))
 
         else:
             #マウスを離したらロープ解除
@@ -442,19 +480,46 @@ class AppMain:
         if self.rope:
             self.rope.update()
         # エフェクト更新
-        for e in list(self.effects):
-            e.update()
-            if e.life <= 0:
+        # particles update and cull
+        for p in list(self.particles):
+            p.update()
+            if hasattr(p, 'life') and p.life <= 0:
                 try:
-                    self.effects.remove(e)
+                    self.particles.remove(p)
                 except ValueError:
                     pass
+
+        # periodically spawn leaves from visible attach points
+        now = pygame.time.get_ticks()
+        if now - self.last_leaf_spawn > 1200:
+            self.last_leaf_spawn = now
+            # select some visible attach points near camera
+            visible_attach = []
+            for b in self.ceiling.blocks:
+                rect = b['rect']
+                if rect.right - self.scroll_x < 0 or rect.left - self.scroll_x > self.world.width:
+                    continue
+                for ax in b['attach_points']:
+                    if random.random() < 0.12:
+                        visible_attach.append((ax, rect.bottom))
+            for ax, ay in visible_attach:
+                for _ in range(random.randint(1, 3)):
+                    vx = random.uniform(-0.6, 0.6)
+                    vy = random.uniform(0.5, 1.5)
+                    self.particles.append(LeafParticle((ax + random.uniform(-6,6), ay + random.uniform(4,10)), (vx, vy), life=random.randint(80,200)))
 
         # コレクティブルの取得判定
         for c in self.collectibles:
             if not c.collected and c.check_collect(self.player):
                 self.coin += 1
                 self.score += 100
+                # coin collect burst
+                for i in range(12):
+                    ang = random.uniform(0, math.pi*2)
+                    spd = random.uniform(1.0, 3.0)
+                    vel = pygame.Vector2(math.cos(ang)*spd, math.sin(ang)*spd - 1.5)
+                    col = (255, 200, 60)
+                    self.particles.append(Spark(c.pos, vel, life=random.randint(20,40), color=col, size=5))
         #トゲに当たったらゲームオーバー
         if self.spikes.check_hit(self.player):
             self.state = "GAMEOVER"
@@ -517,9 +582,9 @@ class AppMain:
             self.rope.draw(self.screen, self.scroll_x)
         self.player.draw(self.screen, self.scroll_x)
 
-        # エフェクト描画
-        for e in self.effects:
-            e.draw(self.screen, self.scroll_x)
+        # particle 描画
+        for p in self.particles:
+            p.draw(self.screen, self.scroll_x)
 
         #スコアやメッセージを表示
         # HUD: 距離 + コイン
