@@ -274,19 +274,22 @@ class CeilingMap:
                 pygame.draw.circle(screen, (34, 139, 34), (px, py), 5)
                 pygame.draw.circle(screen, (50, 205, 50), (px, py-2), 3)
 
-                # small hanging vine from attach point
+                # small hanging vine from attach point (simpler sway animation)
                 vine_len = random.randint(40, 120)
-                segs = max(4, vine_len // 10)
+                segs = max(3, vine_len // 30)
+                # simple time-based sway (same phase for whole vine, smaller toward tip)
+                ttime = pygame.time.get_ticks() * 0.002
+                sway = math.sin(ttime + px * 0.01) * 6
                 points = []
                 for si in range(segs + 1):
-                    t = si / segs
-                    vx = px + int(math.sin((px * 0.01) + si * 0.6) * 6)
-                    vy = int(py + t * vine_len)
+                    frac = si / segs
+                    vx = px + int(sway * (1.0 - frac))
+                    vy = int(py + frac * vine_len)
                     points.append((vx, vy))
                 if len(points) > 1:
                     pygame.draw.lines(screen, (34, 100, 34), False, points, 2)
-                    # leaves along vine
-                    for li, p in enumerate(points[2::3]):
+                    # leaves at a couple of positions along the vine
+                    for p in points[1::max(1, len(points)//3)]:
                         lx = p[0]
                         ly = p[1]
                         pygame.draw.polygon(screen, (34, 139, 34), [(lx, ly), (lx-6, ly+8), (lx+6, ly+8)])
