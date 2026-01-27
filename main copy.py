@@ -79,10 +79,7 @@ class Spark:
         self.size = size
 
     def update(self):
-        # 軽い重力と空気抵抗
-        self.vel += pygame.Vector2(0, 0.18)
-        self.vel *= 0.995
-        self.pos += self.vel
+        # no motion: only fade out (static spark)
         self.life -= 1
 
     def draw(self, screen, scroll_x):
@@ -95,35 +92,7 @@ class Spark:
         screen.blit(s, (int(self.pos.x - scroll_x - self.size), int(self.pos.y - self.size)))
 
 
-class LeafParticle:
-    """落ちる葉のパーティクル（回転・揺れ）"""
-    def __init__(self, pos, vel, life=120, color=(60,140,60)):
-        self.pos = pygame.Vector2(pos)
-        self.vel = pygame.Vector2(vel)
-        self.life = life
-        self.max_life = life
-        self.color = color
-        self.rot = random.uniform(0, 360)
-        self.rot_speed = random.uniform(-3, 3)
-        self.size = random.randint(6, 12)
 
-    def update(self):
-        # gentle sway + gravity
-        t = pygame.time.get_ticks() * 0.001
-        self.vel.x += math.sin(t + self.pos.x * 0.01) * 0.03
-        self.vel.y += 0.06
-        self.pos += self.vel
-        self.rot += self.rot_speed
-        self.life -= 1
-
-    def draw(self, screen, scroll_x):
-        if self.life <= 0:
-            return
-        alpha = int(200 * (self.life / max(1, self.max_life)))
-        surf = pygame.Surface((self.size*2, self.size), pygame.SRCALPHA)
-        pygame.draw.ellipse(surf, (self.color[0], self.color[1], self.color[2], alpha), (0, 0, self.size*2, self.size))
-        rs = pygame.transform.rotate(surf, self.rot)
-        screen.blit(rs, (int(self.pos.x - scroll_x - rs.get_width()/2), int(self.pos.y - rs.get_height()/2)))
 
 
 class Collectible:
@@ -274,12 +243,11 @@ class CeilingMap:
                 pygame.draw.circle(screen, (34, 139, 34), (px, py), 5)
                 pygame.draw.circle(screen, (50, 205, 50), (px, py-2), 3)
 
-                # small hanging vine from attach point (simpler sway animation)
+                # small hanging vine from attach point (static, no animation)
                 vine_len = random.randint(40, 120)
                 segs = max(3, vine_len // 30)
-                # simple time-based sway (same phase for whole vine, smaller toward tip)
-                ttime = pygame.time.get_ticks() * 0.002
-                sway = math.sin(ttime + px * 0.01) * 6
+                # static sway based on position only (no time dependence)
+                sway = math.sin(px * 0.01) * 6
                 points = []
                 for si in range(segs + 1):
                     frac = si / segs
@@ -492,24 +460,7 @@ class AppMain:
                 except ValueError:
                     pass
 
-        # periodically spawn leaves from visible attach points
-        now = pygame.time.get_ticks()
-        if now - self.last_leaf_spawn > 1200:
-            self.last_leaf_spawn = now
-            # select some visible attach points near camera
-            visible_attach = []
-            for b in self.ceiling.blocks:
-                rect = b['rect']
-                if rect.right - self.scroll_x < 0 or rect.left - self.scroll_x > self.world.width:
-                    continue
-                for ax in b['attach_points']:
-                    if random.random() < 0.12:
-                        visible_attach.append((ax, rect.bottom))
-            for ax, ay in visible_attach:
-                for _ in range(random.randint(1, 3)):
-                    vx = random.uniform(-0.6, 0.6)
-                    vy = random.uniform(0.5, 1.5)
-                    self.particles.append(LeafParticle((ax + random.uniform(-6,6), ay + random.uniform(4,10)), (vx, vy), life=random.randint(80,200)))
+        
 
         # コレクティブルの取得判定
         for c in self.collectibles:
