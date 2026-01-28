@@ -66,30 +66,7 @@ class Particle:
         pygame.draw.circle(screen, (0,0,0), (draw_x + eye_offset, draw_y - 4), 3)
 
 
-class Spark:
-    """小さなパーティクル効果（ロープ接続時など）
-    - color, size を持ちフェードアウトする。
-    """
-    def __init__(self, pos, vel, life=30, color=(255,215,0), size=4):
-        self.pos = pygame.Vector2(pos)
-        self.vel = pygame.Vector2(vel)
-        self.life = life
-        self.max_life = life
-        self.color = color
-        self.size = size
-
-    def update(self):
-        # no motion: only fade out (static spark)
-        self.life -= 1
-
-    def draw(self, screen, scroll_x):
-        if self.life <= 0:
-            return
-        alpha = int(255 * (self.life / max(1, self.max_life)))
-        s = pygame.Surface((self.size*2, self.size*2), pygame.SRCALPHA)
-        r,g,b = self.color
-        s.fill((r, g, b, alpha))
-        screen.blit(s, (int(self.pos.x - scroll_x - self.size), int(self.pos.y - self.size)))
+# Particles removed for simpler visuals (no animated particles)
 
 
 
@@ -318,6 +295,7 @@ class AppMain:
         self.coin = 0
         self.scroll_x = 0
         self.rope = None
+        # particles removed; keep list placeholder for compatibility
         self.particles = []
         self.collectibles = []
         self.paused = False
@@ -438,9 +416,7 @@ class AppMain:
 
                         self.player.vel += tangent * KICK_STRENGTH
                     # 接続時の小さなエフェクト
-                    for i in range(8):
-                        vel = pygame.Vector2(random.uniform(-2, 2), random.uniform(-4, -1))
-                        self.particles.append(Spark(self.rope.anchor, vel, life=random.randint(12, 28)))
+                    # no particle effects for simpler visuals
 
         else:
             #マウスを離したらロープ解除
@@ -451,14 +427,7 @@ class AppMain:
         if self.rope:
             self.rope.update()
         # エフェクト更新
-        # particles update and cull
-        for p in list(self.particles):
-            p.update()
-            if hasattr(p, 'life') and p.life <= 0:
-                try:
-                    self.particles.remove(p)
-                except ValueError:
-                    pass
+        # particles removed — nothing to update
 
         
 
@@ -467,13 +436,7 @@ class AppMain:
             if not c.collected and c.check_collect(self.player):
                 self.coin += 1
                 self.score += 100
-                # coin collect burst
-                for i in range(12):
-                    ang = random.uniform(0, math.pi*2)
-                    spd = random.uniform(1.0, 3.0)
-                    vel = pygame.Vector2(math.cos(ang)*spd, math.sin(ang)*spd - 1.5)
-                    col = (255, 200, 60)
-                    self.particles.append(Spark(c.pos, vel, life=random.randint(20,40), color=col, size=5))
+                # no particle burst; simple score increment only
         #トゲに当たったらゲームオーバー
         if self.spikes.check_hit(self.player):
             self.state = "GAMEOVER"
@@ -536,9 +499,7 @@ class AppMain:
             self.rope.draw(self.screen, self.scroll_x)
         self.player.draw(self.screen, self.scroll_x)
 
-        # particle 描画
-        for p in self.particles:
-            p.draw(self.screen, self.scroll_x)
+        # particles removed — nothing to draw
 
         #スコアやメッセージを表示
         # HUD: 距離 + コイン
