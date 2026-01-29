@@ -220,24 +220,8 @@ class CeilingMap:
                 pygame.draw.circle(screen, (34, 139, 34), (px, py), 5)
                 pygame.draw.circle(screen, (50, 205, 50), (px, py-2), 3)
 
-                # small hanging vine from attach point (static, no animation)
-                vine_len = random.randint(40, 120)
-                segs = max(3, vine_len // 30)
-                # static sway based on position only (no time dependence)
-                sway = math.sin(px * 0.01) * 6
-                points = []
-                for si in range(segs + 1):
-                    frac = si / segs
-                    vx = px + int(sway * (1.0 - frac))
-                    vy = int(py + frac * vine_len)
-                    points.append((vx, vy))
-                if len(points) > 1:
-                    pygame.draw.lines(screen, (34, 100, 34), False, points, 2)
-                    # leaves at a couple of positions along the vine
-                    for p in points[1::max(1, len(points)//3)]:
-                        lx = p[0]
-                        ly = p[1]
-                        pygame.draw.polygon(screen, (34, 139, 34), [(lx, ly), (lx-6, ly+8), (lx+6, ly+8)])
+                # vines removed for simpler visuals; keep attach knob only
+                # small moss dot already drawn above as decorative knob
 
             # draw stalactites (as darker green/brown tips)
             for sx, length in b['stalactites']:
