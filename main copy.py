@@ -213,23 +213,7 @@ class CeilingMap:
                 ry = draw_rect.y + (i % 6)
                 pygame.draw.ellipse(screen, (110, 70, 40), (rx, ry, 20, 8))
 
-            # draw attach points (as small mossy knobs)
-            for ax in b['attach_points']:
-                px = int(ax - scroll_x)
-                py = int(rect.bottom)
-                pygame.draw.circle(screen, (34, 139, 34), (px, py), 5)
-                pygame.draw.circle(screen, (50, 205, 50), (px, py-2), 3)
-
-                # vines removed for simpler visuals; keep attach knob only
-                # small moss dot already drawn above as decorative knob
-
-            # draw stalactites (as darker green/brown tips)
-            for sx, length in b['stalactites']:
-                base_x = sx - scroll_x
-                tip_y = rect.bottom + length
-                pygame.draw.polygon(screen, (60, 40, 20), [(base_x-6, rect.bottom), (base_x, tip_y), (base_x+6, rect.bottom)])
-                # small moss on stalactite
-                pygame.draw.circle(screen, (34, 139, 34), (int(base_x), int(rect.bottom-4)), 3)
+            # attach points and stalactites intentionally not drawn (minimal ceiling visuals)
 
 
 class SpikeFloor:
