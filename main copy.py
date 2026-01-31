@@ -234,21 +234,30 @@ class SpikeFloor:
         start_i = int(scroll_x / spike_w)       #描き始めるのは何番目のトゲからか?
         end_i = start_i + int(self.world.width / spike_w) + 2       #何番目のトゲまで描けばいいか?(予備で2個追加)
 
+        # draw static lava band
+        lava_rect = pygame.Rect(0, self.y, self.world.width, self.world.height - self.y)
+        pygame.draw.rect(screen, (120, 30, 10), lava_rect)
+
         for i in range(start_i, end_i):
             base_x = i * spike_w - scroll_x     #ゲーム世界の絶対値座標-カメラ位置
-            #ギザギザの三角形
+            # stylized lava spike (deterministic variation using base_x)
+            tip_h = int((math.sin(base_x * 0.05) + 1.0) * 12) + 8
             p1 = (base_x, self.world.height)
-            p2 = (base_x + spike_w/2, self.y)       #トゲの先端
+            p2 = (base_x + spike_w/2, self.y - tip_h)
             p3 = (base_x + spike_w, self.world.height)
-            pygame.draw.polygon(screen, (30, 80, 30), [p1, p2, p3])
+            pygame.draw.polygon(screen, (200, 70, 20), [p1, p2, p3])
 
-            # 手前に草やシダを描画してジャングル感を演出
-            plant_x = base_x + spike_w/2
-            plant_base_y = self.world.height
-            for j in range(3):
-                offset = j * 6
-                leaf_h = random.randint(12, 28)
-                pygame.draw.polygon(screen, (16, 120, 16), [(plant_x+offset-8, plant_base_y), (plant_x+offset, plant_base_y-leaf_h), (plant_x+offset+8, plant_base_y)])
+            # inner glow near tip
+            inner_tip_h = max(4, int(tip_h * 0.5))
+            ip2 = (base_x + spike_w/2, self.y - inner_tip_h)
+            ip1 = (base_x + spike_w*0.25, self.world.height - 6)
+            ip3 = (base_x + spike_w*0.75, self.world.height - 6)
+            pygame.draw.polygon(screen, (255, 150, 50), [ip1, ip2, ip3])
+
+            # small hot spot at spike top
+            glow_x = int(base_x + spike_w/2)
+            glow_y = int(self.y - tip_h + 6)
+            pygame.draw.circle(screen, (255, 200, 80), (glow_x, glow_y), 3)
 
 
 class AppMain:
