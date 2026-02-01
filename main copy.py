@@ -140,11 +140,11 @@ class CeilingMap:
     """
     def __init__(self, world):
         self.world = world
-        self.blocks = []  # each block: dict with rect, attach_points, stalactites
+        self.blocks = []  # each block: dict with rect and attach_points
 
         #スタート地点の天井を作る
         start_rect = pygame.Rect(-200, 0, 800, 50)
-        self.blocks.append({'rect': start_rect, 'attach_points': [start_rect.left + 200], 'stalactites': []})
+        self.blocks.append({'rect': start_rect, 'attach_points': [start_rect.left + 200]})
 
         #12000px先まで天井を作る（より難しく）
         current_x = 600
@@ -160,14 +160,8 @@ class CeilingMap:
                 ax = random.randint(rect.left + 12, rect.right - 12)
                 attach_points.append(ax)
 
-            # stalactites: list of (x, length) relative to rect (増加確率と長さ)
-            stalactites = []
-            for sx in range(rect.left + 8, rect.right - 8, 32):
-                if random.random() < 0.40:
-                    length = random.randint(12, min(90, h - 5))
-                    stalactites.append((sx, length))
-
-            self.blocks.append({'rect': rect, 'attach_points': attach_points, 'stalactites': stalactites})
+            # no stalactites: keep only attach points for simplicity
+            self.blocks.append({'rect': rect, 'attach_points': attach_points})
             current_x += w + random.randint(80, 300)
 
     def get_ceiling_y(self, x):
@@ -176,10 +170,7 @@ class CeilingMap:
             if rect.left <= x <= rect.right:
                 # base ceiling bottom
                 bottom = rect.bottom
-                # if a stalactite exists near x, return lower y (stalactite tip)
-                for sx, length in b['stalactites']:
-                    if abs(sx - x) < 20:
-                        return bottom + length
+                # return base ceiling bottom (no stalactite collision)
                 return bottom
         return None
 
