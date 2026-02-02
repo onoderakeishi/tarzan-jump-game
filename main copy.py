@@ -127,10 +127,41 @@ class Rope:
                     self.player.vel -= normal * dot
 
     def draw(self, screen, scroll_x):
-        start = (int(self.anchor.x - scroll_x), int(self.anchor.y))
-        end = (int(self.player.x - scroll_x), int(self.player.y))
-        pygame.draw.line(screen, (34, 139, 34), start, end, 3)
-        pygame.draw.circle(screen, (50, 205, 50), start, 6) #支点を描く
+        # screen coordinates
+        start_v = pygame.Vector2(self.anchor.x - scroll_x, self.anchor.y)
+        end_v = pygame.Vector2(self.player.x - scroll_x, self.player.y)
+
+        # draw rope shadow
+        shadow_offset = pygame.Vector2(2, 3)
+        pygame.draw.line(screen, (20, 20, 20), (start_v + shadow_offset), (end_v + shadow_offset), 6)
+
+        # main rope (braided look by drawing alternating thin highlights)
+        rope_color = (170, 120, 60)
+        pygame.draw.line(screen, rope_color, start_v, end_v, 4)
+
+        # small highlight along rope
+        highlight = (230, 200, 150)
+        dir_vec = (end_v - start_v)
+        length = dir_vec.length()
+        if length > 0:
+            unit = dir_vec.normalize()
+            perp = pygame.Vector2(-unit.y, unit.x) * 1.5
+            pygame.draw.line(screen, highlight, start_v + perp, end_v + perp, 2)
+
+            # decorative segments to suggest twist: small alternating dots along rope
+            seg_w = 14
+            seg_count = max(1, int(length / seg_w))
+            for i in range(seg_count + 1):
+                t = i / seg_count
+                pos = start_v + unit * (t * length)
+                color_dot = (140, 90, 40) if i % 2 == 0 else (200, 160, 110)
+                pygame.draw.circle(screen, color_dot, (int(pos.x), int(pos.y)), 2)
+
+        # draw anchor as a metal ring (shadow + rim + hole)
+        anchor_screen = (int(self.anchor.x - scroll_x), int(self.anchor.y))
+        pygame.draw.circle(screen, (30, 30, 30), (anchor_screen[0]+2, anchor_screen[1]+3), 8) # shadow
+        pygame.draw.circle(screen, (80, 80, 80), anchor_screen, 7) # rim
+        pygame.draw.circle(screen, (30, 30, 30), anchor_screen, 3) # hole
 
 
 class CeilingMap:
