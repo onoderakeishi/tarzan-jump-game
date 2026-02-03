@@ -157,11 +157,23 @@ class Rope:
                 color_dot = (140, 90, 40) if i % 2 == 0 else (200, 160, 110)
                 pygame.draw.circle(screen, color_dot, (int(pos.x), int(pos.y)), 2)
 
-        # draw anchor as a metal ring (shadow + rim + hole)
-        anchor_screen = (int(self.anchor.x - scroll_x), int(self.anchor.y))
-        pygame.draw.circle(screen, (30, 30, 30), (anchor_screen[0]+2, anchor_screen[1]+3), 8) # shadow
-        pygame.draw.circle(screen, (80, 80, 80), anchor_screen, 7) # rim
-        pygame.draw.circle(screen, (30, 30, 30), anchor_screen, 3) # hole
+        # draw penetration / anchor: small hole and a wooden/metal plug driven into ceiling
+        ax = int(self.anchor.x - scroll_x)
+        ay = int(self.anchor.y)
+
+        # small indentation/hole on ceiling (slightly above actual anchor to sit on ceiling surface)
+        hole_y = ay - 2
+        pygame.draw.circle(screen, (30, 20, 15), (ax, hole_y), 6)   # dark hole
+        pygame.draw.circle(screen, (90, 60, 40), (ax, hole_y), 4)   # rim
+
+        # plug / spike that looks embedded into ceiling
+        plug_h = 12
+        pygame.draw.polygon(screen, (70, 40, 20), [(ax-5, ay), (ax+5, ay), (ax, ay-plug_h)])
+
+        # subtle chips around hole
+        chips = [(-8, -2), (8, -1), (-4, 6), (5, 4)]
+        for dx, dy in chips:
+            pygame.draw.line(screen, (50, 30, 20), (ax+dx, hole_y+dy), (ax+dx+int(dx*0.2), hole_y+dy+3), 1)
 
 
 class CeilingMap:
