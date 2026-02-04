@@ -157,23 +157,16 @@ class Rope:
                 color_dot = (140, 90, 40) if i % 2 == 0 else (200, 160, 110)
                 pygame.draw.circle(screen, color_dot, (int(pos.x), int(pos.y)), 2)
 
-        # draw penetration / anchor: small hole and a wooden/metal plug driven into ceiling
+        # draw simple tie/knot at anchor to match ceiling hooks
         ax = int(self.anchor.x - scroll_x)
         ay = int(self.anchor.y)
-
-        # small indentation/hole on ceiling (slightly above actual anchor to sit on ceiling surface)
-        hole_y = ay - 2
-        pygame.draw.circle(screen, (30, 20, 15), (ax, hole_y), 6)   # dark hole
-        pygame.draw.circle(screen, (90, 60, 40), (ax, hole_y), 4)   # rim
-
-        # plug / spike that looks embedded into ceiling
-        plug_h = 12
-        pygame.draw.polygon(screen, (70, 40, 20), [(ax-5, ay), (ax+5, ay), (ax, ay-plug_h)])
-
-        # subtle chips around hole
-        chips = [(-8, -2), (8, -1), (-4, 6), (5, 4)]
-        for dx, dy in chips:
-            pygame.draw.line(screen, (50, 30, 20), (ax+dx, hole_y+dy), (ax+dx+int(dx*0.2), hole_y+dy+3), 1)
+        # small shadow under ring
+        pygame.draw.circle(screen, (20, 20, 20), (ax+2, ay+4), 6)
+        # ring where rope ties
+        pygame.draw.circle(screen, (60, 60, 60), (ax, ay), 6)
+        pygame.draw.circle(screen, (180, 180, 180), (ax, ay), 3)
+        # short knot connector (visual only; rope line drawn above)
+        pygame.draw.line(screen, (40, 30, 20), (ax, ay+4), (ax, ay+8), 2)
 
 
 class CeilingMap:
@@ -247,7 +240,22 @@ class CeilingMap:
                 ry = draw_rect.y + (i % 6)
                 pygame.draw.ellipse(screen, (110, 70, 40), (rx, ry, 20, 8))
 
-            # attach points and stalactites intentionally not drawn (minimal ceiling visuals)
+            # draw small metal hooks at attach points
+            for ax in b['attach_points']:
+                hx = int(ax - scroll_x)
+                hy = int(rect.bottom)
+                # mounting plate
+                plate_rect = pygame.Rect(hx-6, hy-8, 12, 6)
+                pygame.draw.rect(screen, (90, 90, 90), plate_rect)
+                pygame.draw.rect(screen, (140, 140, 140), plate_rect, 1)
+
+                # short line down to hook ring
+                ring_y = hy + 8
+                pygame.draw.line(screen, (80, 80, 80), (hx, hy-2), (hx, ring_y-2), 2)
+
+                # hook ring
+                pygame.draw.circle(screen, (70, 70, 70), (hx, ring_y), 5)
+                pygame.draw.circle(screen, (160, 160, 160), (hx, ring_y), 3)
 
 
 class SpikeFloor:
