@@ -123,17 +123,6 @@ class Rope:
         start = (int(self.anchor.x - scroll_x), int(self.anchor.y))
         end = (int(self.player.x - scroll_x), int(self.player.y))
         pygame.draw.line(screen, (34, 139, 34), start, end, 3)
-        
-        # ロープの先端をフック形状に描画
-        hook_size = 8
-        hook_x = int(self.anchor.x - scroll_x)
-        hook_y = int(self.anchor.y)
-        
-        # フックの基本形状（カーブ）
-        pygame.draw.circle(screen, (34, 139, 34), (hook_x, hook_y), hook_size)  # メイン部分
-        # フックの引っ掛かり部分
-        pygame.draw.line(screen, (34, 139, 34), (hook_x + hook_size - 2, hook_y - 2), 
-                        (hook_x + hook_size + 3, hook_y - 5), 2)  # 引っ掛かり部分
 
 
 class CeilingMap:
