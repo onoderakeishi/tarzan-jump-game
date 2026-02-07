@@ -240,23 +240,6 @@ class CeilingMap:
                 ry = draw_rect.y + (i % 6)
                 pygame.draw.ellipse(screen, (110, 70, 40), (rx, ry, 20, 8))
 
-            # draw small metal hooks at attach points
-            for ax in b['attach_points']:
-                hx = int(ax - scroll_x)
-                hy = int(rect.bottom)
-                # mounting plate
-                plate_rect = pygame.Rect(hx-6, hy-8, 12, 6)
-                pygame.draw.rect(screen, (90, 90, 90), plate_rect)
-                pygame.draw.rect(screen, (140, 140, 140), plate_rect, 1)
-
-                # short line down to hook ring
-                ring_y = hy + 8
-                pygame.draw.line(screen, (80, 80, 80), (hx, hy-2), (hx, ring_y-2), 2)
-
-                # hook ring
-                pygame.draw.circle(screen, (70, 70, 70), (hx, ring_y), 5)
-                pygame.draw.circle(screen, (160, 160, 160), (hx, ring_y), 3)
-
 
 class SpikeFloor:
     """ トゲトゲの床 """
