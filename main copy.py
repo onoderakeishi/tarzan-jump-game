@@ -57,9 +57,16 @@ class Particle:
         #位置更新
         self.pos += self.vel * self.world.dt
 
-    def draw(self, screen, scroll_x):
+    def draw(self, screen, scroll_x, powerup_active=False):
         draw_x = int(self.x - scroll_x)     #スクロール分を引く
         draw_y = int(self.y)
+        
+        # パワーアップ中はオーラを表示
+        if powerup_active:
+            glow = (math.sin(pygame.time.get_ticks() * 0.01) + 1) / 2
+            aura_radius = int(self.radius + 8 + glow * 5)
+            pygame.draw.circle(screen, (255, 100, 255, 128), (draw_x, draw_y), aura_radius)
+        
         pygame.draw.circle(screen, (255, 204, 153), (draw_x, draw_y), self.radius)
         #目をつけて、速度の正負によって向きをわかりやすくした
         eye_offset = 5 if self.vx >= 0 else -5
@@ -92,8 +99,47 @@ class Collectible:
             return
         draw_x = int(self.pos.x - scroll_x)
         draw_y = int(self.pos.y)
-        pygame.draw.circle(screen, (255, 223, 0), (draw_x, draw_y), self.radius)
+        # 回転アニメーション
+        angle = pygame.time.get_ticks() * 0.005
+        glow = (math.sin(angle * 2) + 1) / 2
+        color = (255, int(223 + 32 * glow), 0)
+        pygame.draw.circle(screen, color, (draw_x, draw_y), self.radius)
         pygame.draw.circle(screen, (255, 255, 255), (draw_x-2, draw_y-2), 3)
+
+
+class PowerUp:
+    """スピードブーストのパワーアップ"""
+    def __init__(self, x, y):
+        self.pos = pygame.Vector2(x, y)
+        self.radius = 12
+        self.collected = False
+
+    def check_collect(self, player):
+        if self.collected:
+            return False
+        if player.pos.distance_to(self.pos) < self.radius + player.radius:
+            self.collected = True
+            return True
+        return False
+
+    def draw(self, screen, scroll_x):
+        if self.collected:
+            return
+        draw_x = int(self.pos.x - scroll_x)
+        draw_y = int(self.pos.y)
+        # 星形のパワーアップ
+        angle = pygame.time.get_ticks() * 0.003
+        for i in range(5):
+            a1 = angle + i * (2 * math.pi / 5)
+            a2 = angle + (i + 0.5) * (2 * math.pi / 5)
+            p1 = (draw_x + math.cos(a1) * self.radius, draw_y + math.sin(a1) * self.radius)
+            p2 = (draw_x + math.cos(a2) * self.radius * 0.5, draw_y + math.sin(a2) * self.radius * 0.5)
+            if i == 4:
+                p3 = (draw_x + math.cos(angle) * self.radius, draw_y + math.sin(angle) * self.radius)
+            else:
+                p3 = (draw_x + math.cos(a1 + 2 * math.pi / 5) * self.radius, draw_y + math.sin(a1 + 2 * math.pi / 5) * self.radius)
+            pygame.draw.polygon(screen, (255, 50, 255), [(draw_x, draw_y), p1, p2])
+        pygame.draw.circle(screen, (255, 255, 255), (draw_x, draw_y), 5)
 
 
 class Rope:
@@ -295,11 +341,16 @@ class AppMain:
         self.font_small = pygame.font.SysFont(None, 22)
         self.score = 0
         self.coin = 0
+        self.combo = 0
+        self.combo_timer = 0
+        self.speed_bonus = 0
+        self.powerup_timer = 0
         self.scroll_x = 0
         self.rope = None
         # particles removed; keep list placeholder for compatibility
         self.particles = []
         self.collectibles = []
+        self.powerups = []
         self.paused = False
         self.reset_game()       #ゲームオーバー後の再スタートに使えるように関数で用意
         self.state = "READY" #クリックでスタートするので、ゲーム開始前の状態を用意
@@ -322,10 +373,15 @@ class AppMain:
         self.state = "PLAYING" #状態をプレイ中にする
         self.score = 0
         self.coin = 0
+        self.combo = 0
+        self.combo_timer = 0
+        self.speed_bonus = 0
+        self.powerup_timer = 0
         self.particles.clear()
 
         # collectibles を生成: 各ブロックの接続点から少し離れた位置にランダム配置
         self.collectibles = []
+        self.powerups = []
         for b in self.ceiling.blocks:
             rect = b['rect']
             for ax in b['attach_points']:
@@ -333,6 +389,11 @@ class AppMain:
                     cx = ax + random.randint(-40, 40)
                     cy = rect.bottom + random.randint(80, 140)
                     self.collectibles.append(Collectible(cx, cy))
+                # パワーアップは稀に出現
+                elif random.random() < 0.08:
+                    px = ax + random.randint(-30, 30)
+                    py = rect.bottom + random.randint(100, 160)
+                    self.powerups.append(PowerUp(px, py))
 
     def get_rope_target(self):
         start_y = self.player.y - 100    #とりあえず高さ100px上を基準にしてみる
@@ -406,6 +467,10 @@ class AppMain:
                 if ceil_y is not None and ceil_y < self.player.y:
                     self.rope = Rope(target_x, ceil_y, self.player, self.world)
                     
+                    # コンボ増加
+                    self.combo += 1
+                    self.combo_timer = 120  # 2秒間（60FPS想定）
+                    
                     #加速させる(接線方向に力を加える)
                     rope_vec = self.rope.anchor - self.player.pos   #プレイヤーから支点へのベクトル
 
@@ -416,7 +481,9 @@ class AppMain:
                         if tangent.x < 0:
                             tangent =- tangent   #右向きにブーストしたいので、x成分が正になるようにする
 
-                        self.player.vel += tangent * KICK_STRENGTH
+                        # パワーアップ中はブースト強化
+                        boost = KICK_STRENGTH * (1.5 if self.powerup_timer > 0 else 1.0)
+                        self.player.vel += tangent * boost
                     # 接続時の小さなエフェクト
                     # no particle effects for simpler visuals
 
@@ -431,14 +498,35 @@ class AppMain:
         # エフェクト更新
         # particles removed — nothing to update
 
+        # コンボタイマー更新
+        if self.combo_timer > 0:
+            self.combo_timer -= 1
+        else:
+            self.combo = 0
         
+        # パワーアップタイマー更新
+        if self.powerup_timer > 0:
+            self.powerup_timer -= 1
+
+        # スピードボーナス計算
+        speed = self.player.vel.length()
+        if speed > 7:
+            self.speed_bonus += int((speed - 7) * 2)
 
         # コレクティブルの取得判定
         for c in self.collectibles:
             if not c.collected and c.check_collect(self.player):
                 self.coin += 1
-                self.score += 100
+                # コンボボーナス適用
+                bonus = 100 * (1 + self.combo * 0.5)
+                self.score += int(bonus)
                 # no particle burst; simple score increment only
+        
+        # パワーアップの取得判定
+        for p in self.powerups:
+            if not p.collected and p.check_collect(self.player):
+                self.powerup_timer = 180  # 3秒間のパワーアップ
+                self.score += 500
         #トゲに当たったらゲームオーバー
         if self.spikes.check_hit(self.player):
             self.state = "GAMEOVER"
@@ -466,6 +554,10 @@ class AppMain:
         # collectibles
         for c in self.collectibles:
             c.draw(self.screen, self.scroll_x)
+        
+        # powerups
+        for p in self.powerups:
+            p.draw(self.screen, self.scroll_x)
 
         #ゴールラインの描画
         goal_rect = pygame.Rect(GOAL_X - self.scroll_x, 0, 50, self.world.height)
@@ -499,7 +591,7 @@ class AppMain:
         #プレイヤーとロープを表示
         if self.rope:
             self.rope.draw(self.screen, self.scroll_x)
-        self.player.draw(self.screen, self.scroll_x)
+        self.player.draw(self.screen, self.scroll_x, self.powerup_timer > 0)
 
         # particles removed — nothing to draw
 
@@ -507,10 +599,31 @@ class AppMain:
         # HUD: 距離 + コイン
         dist_text = self.font_small.render(f"DIST: {int(self.player.x)} / {GOAL_X}", True, (255, 255, 255))
         coin_text = self.font_small.render(f"COINS: {self.coin}", True, (255, 223, 0))
-        score_text = self.font_small.render(f"SCORE: {self.score}", True, (255, 255, 255))
+        score_text = self.font_small.render(f"SCORE: {self.score + self.speed_bonus}", True, (255, 255, 255))
         self.screen.blit(dist_text, (20, 20))
         self.screen.blit(coin_text, (20, 44))
         self.screen.blit(score_text, (20, 68))
+        
+        # コンボ表示（コンボが2以上の時のみ）
+        if self.combo >= 2:
+            combo_size = min(80, 40 + self.combo * 5)
+            combo_font = pygame.font.SysFont(None, combo_size)
+            combo_color = (255, int(100 + self.combo * 20), 0)
+            combo_text = combo_font.render(f"{self.combo}x COMBO!", True, combo_color)
+            # 画面中央上部に表示
+            combo_x = self.world.width // 2 - combo_text.get_width() // 2
+            combo_y = 100
+            # 影をつける
+            shadow = combo_font.render(f"{self.combo}x COMBO!", True, (0, 0, 0))
+            self.screen.blit(shadow, (combo_x + 3, combo_y + 3))
+            self.screen.blit(combo_text, (combo_x, combo_y))
+        
+        # パワーアップ状態表示
+        if self.powerup_timer > 0:
+            powerup_text = self.font_small.render("POWER UP!", True, (255, 50, 255))
+            flash = int((self.powerup_timer % 20) / 10)
+            if flash == 0:
+                self.screen.blit(powerup_text, (self.world.width - 150, 20))
 
         #状態ごとのメッセージ表示
         if self.state == "READY":
