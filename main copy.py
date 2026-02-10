@@ -73,6 +73,86 @@ class Particle:
         pygame.draw.circle(screen, (0,0,0), (draw_x + eye_offset, draw_y - 4), 3)
 
 
+class Particle:
+    """汎用パーティクルエフェクト"""
+    def __init__(self, x, y, vx, vy, color, size=3, life=30, gravity=0.2):
+        self.pos = pygame.Vector2(x, y)
+        self.vel = pygame.Vector2(vx, vy)
+        self.color = color
+        self.size = size
+        self.life = life
+        self.max_life = life
+        self.gravity = gravity
+
+    def update(self):
+        self.vel.y += self.gravity
+        self.pos += self.vel
+        self.life -= 1
+
+    def draw(self, screen, scroll_x):
+        if self.life <= 0:
+            return
+        alpha_ratio = self.life / max(1, self.max_life)
+        current_size = max(1, int(self.size * alpha_ratio))
+        draw_x = int(self.pos.x - scroll_x)
+        draw_y = int(self.pos.y)
+        
+        # 色の明るさをライフに応じて変化
+        if len(self.color) == 3:
+            r, g, b = self.color
+            r = int(r * alpha_ratio)
+            g = int(g * alpha_ratio)
+            b = int(b * alpha_ratio)
+            pygame.draw.circle(screen, (r, g, b), (draw_x, draw_y), current_size)
+        else:
+            pygame.draw.circle(screen, self.color, (draw_x, draw_y), current_size)
+
+
+class TrailParticle:
+    """プレイヤーの残像エフェクト"""
+    def __init__(self, x, y, radius, life=15):
+        self.pos = pygame.Vector2(x, y)
+        self.radius = radius
+        self.life = life
+        self.max_life = life
+
+    def update(self):
+        self.life -= 1
+
+    def draw(self, screen, scroll_x):
+        if self.life <= 0:
+            return
+        alpha_ratio = self.life / max(1, self.max_life)
+        draw_x = int(self.pos.x - scroll_x)
+        draw_y = int(self.pos.y)
+        
+        # 半透明の円を描画
+        s = pygame.Surface((self.radius * 2 + 4, self.radius * 2 + 4), pygame.SRCALPHA)
+        alpha = int(150 * alpha_ratio)
+        pygame.draw.circle(s, (255, 204, 153, alpha), (self.radius + 2, self.radius + 2), self.radius)
+        screen.blit(s, (draw_x - self.radius - 2, draw_y - self.radius - 2))
+
+
+class Star:
+    """背景の星エフェクト"""
+    def __init__(self, x, y):
+        self.pos = pygame.Vector2(x, y)
+        self.size = random.randint(1, 3)
+        self.twinkle_offset = random.random() * math.pi * 2
+
+    def draw(self, screen, scroll_x):
+        draw_x = int(self.pos.x - scroll_x * 0.1)  # パララックス効果
+        draw_y = int(self.pos.y)
+        
+        # またたき
+        glow = (math.sin(pygame.time.get_ticks() * 0.003 + self.twinkle_offset) + 1) / 2
+        alpha = int(100 + 155 * glow)
+        
+        s = pygame.Surface((self.size * 2 + 2, self.size * 2 + 2), pygame.SRCALPHA)
+        pygame.draw.circle(s, (255, 255, 200, alpha), (self.size + 1, self.size + 1), self.size)
+        screen.blit(s, (draw_x % self.world.width if hasattr(self, 'world') else draw_x, draw_y))
+
+
 # Particles removed for simpler visuals (no animated particles)
 
 
@@ -347,10 +427,21 @@ class AppMain:
         self.powerup_timer = 0
         self.scroll_x = 0
         self.rope = None
-        # particles removed; keep list placeholder for compatibility
+        # エフェクト用のリスト
         self.particles = []
+        self.trails = []
+        self.stars = []
         self.collectibles = []
         self.powerups = []
+        self.shake_timer = 0
+        self.shake_intensity = 0
+        
+        # 背景の星を生成
+        for _ in range(50):
+            sx = random.randint(0, 12000)
+            sy = random.randint(10, 300)
+            self.stars.append(Star(sx, sy))
+        
         self.paused = False
         self.reset_game()       #ゲームオーバー後の再スタートに使えるように関数で用意
         self.state = "READY" #クリックでスタートするので、ゲーム開始前の状態を用意
@@ -378,6 +469,9 @@ class AppMain:
         self.speed_bonus = 0
         self.powerup_timer = 0
         self.particles.clear()
+        self.trails.clear()
+        self.shake_timer = 0
+        self.shake_intensity = 0
 
         # collectibles を生成: 各ブロックの接続点から少し離れた位置にランダム配置
         self.collectibles = []
@@ -471,6 +565,17 @@ class AppMain:
                     self.combo += 1
                     self.combo_timer = 120  # 2秒間（60FPS想定）
                     
+                    # ロープ接続時のパーティクルエフェクト
+                    for i in range(20):
+                        angle = random.random() * math.pi * 2
+                        speed = random.uniform(1, 4)
+                        vx = math.cos(angle) * speed
+                        vy = math.sin(angle) * speed - 2
+                        color = random.choice([(255, 215, 0), (255, 255, 100), (200, 200, 255)])
+                        self.particles.append(Particle(target_x, ceil_y, vx, vy, color, 
+                                                      size=random.randint(2, 5), 
+                                                      life=random.randint(20, 40)))
+                    
                     #加速させる(接線方向に力を加える)
                     rope_vec = self.rope.anchor - self.player.pos   #プレイヤーから支点へのベクトル
 
@@ -489,14 +594,45 @@ class AppMain:
 
         else:
             #マウスを離したらロープ解除
+            if self.rope is not None:
+                # ロープ解除時のエフェクト
+                for i in range(10):
+                    angle = random.random() * math.pi * 2
+                    speed = random.uniform(0.5, 2)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed
+                    self.particles.append(Particle(self.rope.anchor.x, self.rope.anchor.y, 
+                                                  vx, vy, (100, 200, 100), 
+                                                  size=2, life=20))
             self.rope = None
 
         #物理演算
         self.player.update()
         if self.rope:
             self.rope.update()
-        # エフェクト更新
-        # particles removed — nothing to update
+        
+        # パーティクル更新
+        for p in list(self.particles):
+            p.update()
+            if p.life <= 0:
+                self.particles.remove(p)
+        
+        # 残像エフェクト更新
+        for t in list(self.trails):
+            t.update()
+            if t.life <= 0:
+                self.trails.remove(t)
+        
+        # 速度が速い時に残像を追加
+        speed = self.player.vel.length()
+        if speed > 6 and len(self.trails) < 30:
+            if random.random() < 0.3:
+                self.trails.append(TrailParticle(self.player.x, self.player.y, 
+                                                self.player.radius, life=10))
+        
+        # 画面シェイク更新
+        if self.shake_timer > 0:
+            self.shake_timer -= 1
 
         # コンボタイマー更新
         if self.combo_timer > 0:
@@ -507,6 +643,17 @@ class AppMain:
         # パワーアップタイマー更新
         if self.powerup_timer > 0:
             self.powerup_timer -= 1
+            # パワーアップ中はキラキラエフェクトを放出
+            if random.random() < 0.3:
+                angle = random.random() * math.pi * 2
+                offset = random.uniform(10, 20)
+                px = self.player.x + math.cos(angle) * offset
+                py = self.player.y + math.sin(angle) * offset
+                vx = random.uniform(-1, 1)
+                vy = random.uniform(-2, 0)
+                self.particles.append(Particle(px, py, vx, vy, 
+                                              (255, 200, 255), 
+                                              size=2, life=20, gravity=0))
 
         # スピードボーナス計算
         speed = self.player.vel.length()
@@ -520,16 +667,52 @@ class AppMain:
                 # コンボボーナス適用
                 bonus = 100 * (1 + self.combo * 0.5)
                 self.score += int(bonus)
-                # no particle burst; simple score increment only
+                # コイン取得エフェクト
+                for i in range(15):
+                    angle = random.random() * math.pi * 2
+                    speed = random.uniform(1, 3)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed - 1
+                    self.particles.append(Particle(c.pos.x, c.pos.y, vx, vy, 
+                                                  (255, 223, 0), 
+                                                  size=random.randint(2, 4), 
+                                                  life=random.randint(15, 30)))
         
         # パワーアップの取得判定
         for p in self.powerups:
             if not p.collected and p.check_collect(self.player):
                 self.powerup_timer = 180  # 3秒間のパワーアップ
                 self.score += 500
+                # 派手なパワーアップ取得エフェクト
+                for i in range(30):
+                    angle = random.random() * math.pi * 2
+                    speed = random.uniform(2, 5)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed
+                    color = random.choice([(255, 50, 255), (255, 100, 255), (200, 50, 200)])
+                    self.particles.append(Particle(p.pos.x, p.pos.y, vx, vy, color, 
+                                                  size=random.randint(3, 6), 
+                                                  life=random.randint(30, 50)))
+                # 画面シェイク
+                self.shake_timer = 10
+                self.shake_intensity = 5
+                
         #トゲに当たったらゲームオーバー
         if self.spikes.check_hit(self.player):
             self.state = "GAMEOVER"
+            # ゲームオーバー時の爆発エフェクト
+            for i in range(50):
+                angle = random.random() * math.pi * 2
+                speed = random.uniform(2, 8)
+                vx = math.cos(angle) * speed
+                vy = math.sin(angle) * speed
+                color = random.choice([(255, 100, 0), (255, 50, 0), (255, 200, 0)])
+                self.particles.append(Particle(self.player.x, self.player.y, vx, vy, color, 
+                                              size=random.randint(3, 8), 
+                                              life=random.randint(30, 60)))
+            # 強い画面シェイク
+            self.shake_timer = 20
+            self.shake_intensity = 10
 
         #スクロールの処理
         #プレイヤーが画面の左から1/3より右に行ったら、カメラも右に動かす
@@ -542,22 +725,50 @@ class AppMain:
         
         #ゴール判定
         if self.player.x > GOAL_X:
+            if self.state != "GOAL":
+                # ゴール到達時の花火エフェクト
+                for i in range(100):
+                    angle = random.random() * math.pi * 2
+                    speed = random.uniform(3, 10)
+                    vx = math.cos(angle) * speed
+                    vy = math.sin(angle) * speed
+                    color = random.choice([(255, 0, 0), (0, 255, 0), (0, 0, 255), 
+                                          (255, 255, 0), (255, 0, 255), (0, 255, 255)])
+                    self.particles.append(Particle(self.player.x, self.player.y, vx, vy, color, 
+                                                  size=random.randint(4, 8), 
+                                                  life=random.randint(40, 80), 
+                                                  gravity=0.15))
             self.state = "GOAL"
 
     def draw(self):
+        # 画面シェイクのオフセット計算
+        shake_x = 0
+        shake_y = 0
+        if self.shake_timer > 0:
+            shake_x = random.randint(-self.shake_intensity, self.shake_intensity)
+            shake_y = random.randint(-self.shake_intensity, self.shake_intensity)
+        
         # 背景を単色で塗る（簡潔に）
         self.screen.fill((120, 180, 255))
+        
+        # 背景の星を描画
+        for star in self.stars:
+            star.draw(self.screen, self.scroll_x)
 
-        self.ceiling.draw(self.screen, self.scroll_x)
-        self.spikes.draw(self.screen, self.scroll_x)
+        self.ceiling.draw(self.screen, self.scroll_x - shake_x)
+        self.spikes.draw(self.screen, self.scroll_x - shake_x)
+        
+        # 残像エフェクトを描画（プレイヤーより先に）
+        for trail in self.trails:
+            trail.draw(self.screen, self.scroll_x - shake_x)
 
         # collectibles
         for c in self.collectibles:
-            c.draw(self.screen, self.scroll_x)
+            c.draw(self.screen, self.scroll_x - shake_x)
         
         # powerups
         for p in self.powerups:
-            p.draw(self.screen, self.scroll_x)
+            p.draw(self.screen, self.scroll_x - shake_x)
 
         #ゴールラインの描画
         goal_rect = pygame.Rect(GOAL_X - self.scroll_x, 0, 50, self.world.height)
@@ -590,10 +801,12 @@ class AppMain:
 
         #プレイヤーとロープを表示
         if self.rope:
-            self.rope.draw(self.screen, self.scroll_x)
-        self.player.draw(self.screen, self.scroll_x, self.powerup_timer > 0)
+            self.rope.draw(self.screen, self.scroll_x - shake_x)
+        self.player.draw(self.screen, self.scroll_x - shake_x, self.powerup_timer > 0)
 
-        # particles removed — nothing to draw
+        # パーティクルエフェクトを描画
+        for particle in self.particles:
+            particle.draw(self.screen, self.scroll_x - shake_x)
 
         #スコアやメッセージを表示
         # HUD: 距離 + コイン
