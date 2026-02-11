@@ -18,7 +18,7 @@ class World:
         self.dt = 1.0
 
 
-class Particle:
+class Player:
     """ 主人公 """
     def __init__(self, x, y, world):
         self.world = world
@@ -456,7 +456,7 @@ class AppMain:
         ceil_y = self.ceiling.get_ceiling_y(start_x)
         if ceil_y is None: ceil_y = 50      #もしスタート地点に天井がなかったら、高さを50にする
         
-        self.player = Particle(start_x, ceil_y + 150, self.world)       #天井から150px下に配置
+        self.player = Player(start_x, ceil_y + 150, self.world)       #天井から150px下に配置
         #最初からぶら下がった状態でスタート
         self.rope = Rope(start_x, ceil_y, self.player, self.world)
         
