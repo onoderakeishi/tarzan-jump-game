@@ -821,7 +821,7 @@ class AppMain:
         if self.combo >= 2:
             combo_size = min(80, 40 + self.combo * 5)
             combo_font = pygame.font.SysFont(None, combo_size)
-            combo_color = (255, int(100 + self.combo * 20), 0)
+            combo_color = (255, min(255, int(100 + self.combo * 20)), 0)
             combo_text = combo_font.render(f"{self.combo}x COMBO!", True, combo_color)
             # 画面中央上部に表示
             combo_x = self.world.width // 2 - combo_text.get_width() // 2
