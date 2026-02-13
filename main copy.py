@@ -47,12 +47,12 @@ class Player:
     @vy.setter
     def vy(self, v): self.vel.y = v
 
-    def update(self):
+    def update(self, speed_limit=10):
         self.vel += self.world.gravity * self.world.dt
 
-        #速度制限
-        if self.vel.length() > 10:
-            self.vel.scale_to_length(10)
+        #速度制限（コンボで上昇可能）
+        if self.vel.length() > speed_limit:
+            self.vel.scale_to_length(speed_limit)
 
         #位置更新
         self.pos += self.vel * self.world.dt
@@ -586,8 +586,10 @@ class AppMain:
                         if tangent.x < 0:
                             tangent =- tangent   #右向きにブーストしたいので、x成分が正になるようにする
 
-                        # パワーアップ中はブースト強化
-                        boost = KICK_STRENGTH * (1.5 if self.powerup_timer > 0 else 1.0)
+                        # パワーアップ中とコンボでブースト強化
+                        combo_boost = 1.0 + (self.combo - 1) * 0.15  # コンボごとに15%増加
+                        powerup_boost = 1.5 if self.powerup_timer > 0 else 1.0
+                        boost = KICK_STRENGTH * combo_boost * powerup_boost
                         self.player.vel += tangent * boost
                     # 接続時の小さなエフェクト
                     # no particle effects for simpler visuals
@@ -607,7 +609,9 @@ class AppMain:
             self.rope = None
 
         #物理演算
-        self.player.update()
+        # コンボに応じて速度制限を上げる（コンボごとに+1）
+        speed_limit = 10 + min(self.combo, 10)  # 最大20まで
+        self.player.update(speed_limit)
         if self.rope:
             self.rope.update()
         
