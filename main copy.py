@@ -614,6 +614,15 @@ class AppMain:
         self.player.update(speed_limit)
         if self.rope:
             self.rope.update()
+
+        # 天井との当たり判定（すり抜け防止）
+        ceil_y = self.ceiling.get_ceiling_y(self.player.x)
+        if ceil_y is not None:
+            ceiling_bottom = ceil_y
+            if self.player.y - self.player.radius < ceiling_bottom:
+                self.player.y = ceiling_bottom + self.player.radius
+                if self.player.vy < 0:
+                    self.player.vy = 0
         
         # パーティクル更新
         for p in list(self.particles):
