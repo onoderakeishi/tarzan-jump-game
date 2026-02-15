@@ -147,6 +147,22 @@ class CeilingMap:
                 return rect.bottom
         return None
 
+    def check_horizontal_collision(self, player):
+        """天井ブロックの左右辺との横衝突判定。衝突情報を返す。
+        Returns: (side, block_rect) or None
+        side: 'left' または 'right'
+        """
+        for rect in self.blocks:
+            # プレイヤーが天井ブロックのy範囲内か確認
+            if player.y - player.radius < rect.bottom and player.y + player.radius > rect.top:
+                # 左辺との衝突
+                if player.x - player.radius < rect.left and player.x + player.radius > rect.left - 10:
+                    return ('left', rect)
+                # 右辺との衝突
+                if player.x + player.radius > rect.right and player.x - player.radius < rect.right + 10:
+                    return ('right', rect)
+        return None
+
     def draw(self, screen, scroll_x):
         for rect in self.blocks:
             if rect.right - scroll_x < 0:
@@ -298,7 +314,7 @@ class AppMain:
         if self.rope:
             self.rope.update()
 
-        # 天井との当たり判定（すり抜け防止）
+        # 天井との当たり判定（上下方向）
         ceil_y = self.ceiling.get_ceiling_y(self.player.x)
         if ceil_y is not None:
             ceiling_bottom = ceil_y
@@ -306,6 +322,21 @@ class AppMain:
                 self.player.y = ceiling_bottom + self.player.radius
                 if self.player.vy < 0:
                     self.player.vy = 0
+
+        # 天井との当たり判定（左右方向）
+        collision = self.ceiling.check_horizontal_collision(self.player)
+        if collision:
+            side, rect = collision
+            if side == 'left':
+                # 右側から衝突
+                self.player.x = rect.left - self.player.radius
+                if self.player.vx < 0:
+                    self.player.vx = 0
+            elif side == 'right':
+                # 左側から衝突
+                self.player.x = rect.right + self.player.radius
+                if self.player.vx > 0:
+                    self.player.vx = 0
 
         # エフェクト更新
         for e in list(self.effects):
