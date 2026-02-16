@@ -6,12 +6,12 @@ import pygame
 
 #ゲームバランスを調整するとき用の定数を定義
 ROPE_ANGLE = 50        #ロープ発射角度
-KICK_STRENGTH = 2.0    #ブーストの強さ
-GOAL_X = 10000        #ゴール地点のX座標
+KICK_STRENGTH = 1.0    #ブーストの強さ
+GOAL_X = 15000        #ゴール地点のX座標
 
 #クラス定義
 class World:
-    def __init__(self, width, height, gravity=0.25):
+    def __init__(self, width, height, gravity=0.4):
         self.width = width
         self.height = height
         self.gravity = pygame.Vector2(0, gravity)
@@ -133,13 +133,13 @@ class CeilingMap:
         #スタート地点の天井を作る
         self.blocks.append(pygame.Rect(-200, 0, 800, 50))
         
-        #12000px先まで天井を作る
+        #15000px先まで天井を作る
         current_x = 600     #最初の天井のx座標
-        while current_x < 12000:
-            w = random.randint(100, 350)        #ランダムに天井の幅を決める
+        while current_x < 15000:
+            w = random.randint(60, 200)        #ランダムに天井の幅を決める
             h = random.randint(50, 200)         #ランダムに天井の高さを決める   
             self.blocks.append(pygame.Rect(current_x, 0, w, h))
-            current_x += w + random.randint(50, 200) #天井と天井の間の隙間を作る
+            current_x += w + random.randint(150, 400) #天井と天井の間の隙間を作る
 
     def get_ceiling_y(self, x):         #指定したx座標の天井のy座標を返す
         for rect in self.blocks:

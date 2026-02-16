@@ -6,12 +6,12 @@ import pygame
 
 #ゲームバランスを調整するとき用の定数を定義
 ROPE_ANGLE = 50        #ロープ発射角度
-KICK_STRENGTH = 1.5    #ブーストの強さ（低下：より難しい）
-GOAL_X = 10000        #ゴール地点のX座標
+KICK_STRENGTH = 0.9    #ブーストの強さ（低下：より難しい）
+GOAL_X = 15000        #ゴール地点のX座標
 
 #クラス定義
 class World:
-    def __init__(self, width, height, gravity=0.35):
+    def __init__(self, width, height, gravity=0.5):
         self.width = width
         self.height = height
         self.gravity = pygame.Vector2(0, gravity)
@@ -308,11 +308,11 @@ class CeilingMap:
         start_rect = pygame.Rect(-200, 0, 800, 50)
         self.blocks.append({'rect': start_rect, 'attach_points': [start_rect.left + 200]})
 
-        #12000px先まで天井を作る（より難しく）
+        #15000px先まで天井を作る（より難しく）
         current_x = 600
-        while current_x < 12000:
-            # さらに小さいブロック幅にして、隙間をさらに広くする -> より難易度上昇
-            w = random.randint(60, 250)
+        while current_x < 15000:
+            # より小さいブロック幅にして、隙間をさらに広くする -> より難易度上昇
+            w = random.randint(50, 180)
             h = random.randint(50, 200)
             rect = pygame.Rect(current_x, 0, w, h)
 
@@ -324,7 +324,7 @@ class CeilingMap:
 
             # no stalactites: keep only attach points for simplicity
             self.blocks.append({'rect': rect, 'attach_points': attach_points})
-            current_x += w + random.randint(120, 400)
+            current_x += w + random.randint(180, 500)
 
     def get_ceiling_y(self, x):
         for b in self.blocks:
