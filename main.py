@@ -136,7 +136,7 @@ class CeilingMap:
         #15000px先まで天井を作る
         current_x = 600     #最初の天井のx座標
         while current_x < 15000:
-            w = random.randint(60, 200)        #ランダムに天井の幅を決める
+            w = random.randint(120, 300)        #ランダムに天井の幅を決める
             h = random.randint(50, 200)         #ランダムに天井の高さを決める   
             self.blocks.append(pygame.Rect(current_x, 0, w, h))
             current_x += w + random.randint(150, 400) #天井と天井の間の隙間を作る

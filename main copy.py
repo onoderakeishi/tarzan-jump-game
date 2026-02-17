@@ -312,7 +312,7 @@ class CeilingMap:
         current_x = 600
         while current_x < 15000:
             # より小さいブロック幅にして、隙間をさらに広くする -> より難易度上昇
-            w = random.randint(50, 180)
+            w = random.randint(120, 300)
             h = random.randint(50, 200)
             rect = pygame.Rect(current_x, 0, w, h)
 
