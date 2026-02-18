@@ -312,7 +312,7 @@ class CeilingMap:
         current_x = 600
         while current_x < 15000:
             # より小さいブロック幅にして、隙間をさらに広くする -> より難易度上昇
-            w = random.randint(120, 300)
+            w = random.randint(60, 150)
             h = random.randint(50, 200)
             rect = pygame.Rect(current_x, 0, w, h)
 
@@ -324,7 +324,7 @@ class CeilingMap:
 
             # no stalactites: keep only attach points for simplicity
             self.blocks.append({'rect': rect, 'attach_points': attach_points})
-            current_x += w + random.randint(180, 500)
+            current_x += w + random.randint(250, 700)
 
     def get_ceiling_y(self, x):
         for b in self.blocks:
