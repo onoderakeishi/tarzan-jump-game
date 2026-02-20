@@ -8,6 +8,7 @@ import pygame
 ROPE_ANGLE = 50        #ロープ発射角度
 KICK_STRENGTH = 1.0    #ブーストの強さ
 GOAL_X = 15000        #ゴール地点のX座標
+TIME_LIMIT = 60        #制限時間（秒）
 
 #クラス定義
 class World:
@@ -214,6 +215,7 @@ class AppMain:
         self.effects = []       # Spark 等のエフェクト
         self.clouds = [pygame.Vector2(random.randint(0, 12000), random.randint(20, 150)) for _ in range(8)]
         self.paused = False
+        self.time_remaining = TIME_LIMIT  #残り時間
         self.reset_game()       #ゲームオーバー後の再スタートに使えるように関数で用意
         self.state = "READY" #クリックでスタートするので、ゲーム開始前の状態を用意
 
@@ -234,6 +236,7 @@ class AppMain:
         self.scroll_x = 0
         self.state = "PLAYING" #状態をプレイ中にする
         self.score = 0
+        self.time_remaining = TIME_LIMIT  #残り時間をリセット
 
     def get_rope_target(self):
         start_y = self.player.y - 100    #とりあえず高さ100px上を基準にしてみる
@@ -351,6 +354,12 @@ class AppMain:
         if self.spikes.check_hit(self.player):
             self.state = "GAMEOVER"
 
+        #タイマーを更新（1フレーム = 1/60秒）
+        self.time_remaining -= 1/60
+        if self.time_remaining <= 0:
+            self.time_remaining = 0
+            self.state = "GAMEOVER"
+
         #スクロールの処理
         #プレイヤーが画面の左から1/3より右に行ったら、カメラも右に動かす
         target_scroll = self.player.x - self.world.width / 3
@@ -426,6 +435,11 @@ class AppMain:
         #スコアやメッセージを表示
         score_text = self.font.render(f"DIST: {self.score} / {GOAL_X}", True, (255, 255, 255))
         self.screen.blit(score_text, (20, 20))
+        
+        #タイマー表示（残り時間が少ないと赤くなる）
+        time_color = (255, 255, 255) if self.time_remaining > 10 else (255, 100, 100)
+        time_text = self.font.render(f"TIME: {max(0, int(self.time_remaining))}", True, time_color)
+        self.screen.blit(time_text, (self.world.width - 220, 20))
 
         # 進捗バー
         bar_w = 300
