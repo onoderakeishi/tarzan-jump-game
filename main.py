@@ -6,7 +6,7 @@ import pygame
 
 #ゲームバランスを調整するとき用の定数を定義
 ROPE_ANGLE = 50        #ロープ発射角度
-KICK_STRENGTH = 1.0    #ブーストの強さ
+KICK_STRENGTH = 1.8    #ブーストの強さ
 GOAL_X = 15000        #ゴール地点のX座標
 TIME_LIMIT = 60        #制限時間（秒）
 
