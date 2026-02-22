@@ -9,6 +9,8 @@ ROPE_ANGLE = 50        #ロープ発射角度
 KICK_STRENGTH = 1.8    #ブーストの強さ
 GOAL_X = 15000        #ゴール地点のX座標
 TIME_LIMIT = 60        #制限時間（秒）
+GRAVITY = 0.2          #重力（小さめでふわっと）
+AIR_DRAG = 0.99        #空気抵抗（1.0に近いほど減速しない）
 
 #クラス定義
 class World:
@@ -54,6 +56,9 @@ class Particle:
         #速度制限
         if self.vel.length() > 10:
             self.vel.scale_to_length(10)
+
+        #ふわっとした操作感のための軽い空気抵抗
+        self.vel *= AIR_DRAG
 
         #位置更新
         self.pos += self.vel * self.world.dt
@@ -204,7 +209,7 @@ class SpikeFloor:
 class AppMain:
     def __init__(self):
         pygame.init()
-        self.world = World(800, 600, gravity=0.25)
+        self.world = World(800, 600, gravity=GRAVITY)
         self.screen = pygame.display.set_mode((self.world.width, self.world.height))
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont(None, 60)       #フォントを用意
