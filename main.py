@@ -6,7 +6,7 @@ import pygame
 
 #ゲームバランスを調整するとき用の定数を定義
 ROPE_ANGLE = 50        #ロープ発射角度
-KICK_STRENGTH = 1.8    #ブーストの強さ
+KICK_STRENGTH = 2.2    #ブーストの強さ（爽快感アップ）
 GOAL_X = 15000        #ゴール地点のX座標
 TIME_LIMIT = 60        #制限時間（秒）
 GRAVITY = 0.2          #重力（小さめでふわっと）
@@ -66,19 +66,30 @@ class Particle:
     def draw(self, screen, scroll_x):
         draw_x = int(self.x - scroll_x)     #スクロール分を引く
         draw_y = int(self.y)
-        pygame.draw.circle(screen, (255, 204, 153), (draw_x, draw_y), self.radius)
+        
+        # 速度に応じた色の変化
+        speed = self.vel.length()
+        color_intensity = int(min(255, 150 + speed * 10))
+        player_color = (255, 204, min(153 + speed * 5, 255))
+        
+        # プレイヤーを描画（グロー効果）
+        pygame.draw.circle(screen, (color_intensity // 2, color_intensity // 3, color_intensity // 4), (draw_x, draw_y), self.radius + 2)
+        pygame.draw.circle(screen, player_color, (draw_x, draw_y), self.radius)
+        
         #目をつけて、速度の正負によって向きをわかりやすくした
         eye_offset = 5 if self.vx >= 0 else -5
-        pygame.draw.circle(screen, (0,0,0), (draw_x + eye_offset, draw_y - 4), 3)
+        pygame.draw.circle(screen, (0, 0, 0), (draw_x + eye_offset, draw_y - 4), 3)
 
 
 class Spark:
     """小さなパーティクル効果（ロープ接続時など）"""
-    def __init__(self, pos, vel, life=30):
+    def __init__(self, pos, vel, life=30, color=(255, 215, 0), size=4):
         self.pos = pygame.Vector2(pos)
         self.vel = pygame.Vector2(vel)
         self.life = life
         self.max_life = life
+        self.color = color
+        self.size = size
 
     def update(self):
         # 軽い重力と減速
@@ -90,8 +101,9 @@ class Spark:
         if self.life <= 0:
             return
         alpha = int(255 * (self.life / max(1, self.max_life)))
-        s = pygame.Surface((4, 4), pygame.SRCALPHA)
-        s.fill((255, 215, 0, alpha))
+        s = pygame.Surface((self.size, self.size), pygame.SRCALPHA)
+        color_with_alpha = (*self.color, alpha)
+        s.fill(color_with_alpha)
         screen.blit(s, (int(self.pos.x - scroll_x), int(self.pos.y)))
 
 
@@ -101,6 +113,7 @@ class Rope:
         self.world = world
         self.anchor = pygame.Vector2(anchor_x, anchor_y)
         self.player = player
+        self.glow_intensity = 1.0
 
         #ロープの長さは、ロープがかかった瞬間の距離で固定する
         self.length = self.player.pos.distance_to(self.anchor)
@@ -124,10 +137,20 @@ class Rope:
                 #速度成分がロープ方向に向いていたら、その分だけ引く
                 if dot > 0:
                     self.player.vel -= normal * dot
+        
+        # グロー効果を減速（エフェクト用）
+        self.glow_intensity *= 0.95
 
     def draw(self, screen, scroll_x):
         start = (int(self.anchor.x - scroll_x), int(self.anchor.y))
         end = (int(self.player.x - scroll_x), int(self.player.y))
+        
+        # ロープを太く描画（グロー効果）
+        intensity = int(self.glow_intensity * 255)
+        glow_color = (34 + intensity // 3, 139 + intensity // 4, 34 + intensity // 5)
+        pygame.draw.line(screen, glow_color, start, end, 5)
+        
+        # ロープのコア
         pygame.draw.line(screen, (34, 139, 34), start, end, 3)
 
 
@@ -221,6 +244,8 @@ class AppMain:
         self.clouds = [pygame.Vector2(random.randint(0, 12000), random.randint(20, 150)) for _ in range(8)]
         self.paused = False
         self.time_remaining = TIME_LIMIT  #残り時間
+        self.shake_intensity = 0  # スクリーンシェイク用
+        self.prev_player_pos = None  # トレイル生成用
         self.reset_game()       #ゲームオーバー後の再スタートに使えるように関数で用意
         self.state = "READY" #クリックでスタートするので、ゲーム開始前の状態を用意
 
@@ -242,6 +267,8 @@ class AppMain:
         self.state = "PLAYING" #状態をプレイ中にする
         self.score = 0
         self.time_remaining = TIME_LIMIT  #残り時間をリセット
+        self.shake_intensity = 0
+        self.prev_player_pos = pygame.Vector2(self.player.x, self.player.y)
 
     def get_rope_target(self):
         start_y = self.player.y - 100    #とりあえず高さ100px上を基準にしてみる
@@ -308,10 +335,19 @@ class AppMain:
                             tangent =- tangent   #右向きにブーストしたいので、x成分が正になるようにする
 
                         self.player.vel += tangent * KICK_STRENGTH
-                    # 接続時の小さなエフェクト
-                    for i in range(10):
-                        vel = pygame.Vector2(random.uniform(-2, 2), random.uniform(-4, -1))
-                        self.effects.append(Spark(self.rope.anchor, vel, life=random.randint(15, 35)))
+                    
+                    # 接続時の大量エフェクト（爽快感アップ）
+                    self.shake_intensity = 3.0  # スクリーンシェイク
+                    for i in range(20):  # パーティクル数を増加
+                        vel = pygame.Vector2(random.uniform(-3, 3), random.uniform(-5, -1))
+                        self.effects.append(Spark(self.rope.anchor, vel, life=random.randint(20, 40), 
+                                                color=(255, 220, 100), size=5))
+                    
+                    # プレイヤー周辺にも粒が散る
+                    for i in range(15):
+                        vel = pygame.Vector2(random.uniform(-2.5, 2.5), random.uniform(-1, 3))
+                        self.effects.append(Spark(self.player.pos, vel, life=random.randint(15, 35),
+                                                color=(255, 150, 50), size=3))
 
         else:
             #マウスを離したらロープ解除
@@ -321,6 +357,19 @@ class AppMain:
         self.player.update()
         if self.rope:
             self.rope.update()
+        
+        # トレイルエフェクト（スウィング感を出す）
+        if self.prev_player_pos is not None:
+            dist = self.player.pos.distance_to(self.prev_player_pos)
+            if dist > 2 and self.rope is not None:  # ロープ中かつ移動している
+                trail_vel = pygame.Vector2(random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5))
+                self.effects.append(Spark(self.player.pos, trail_vel, life=random.randint(10, 20),
+                                        color=(200, 255, 150), size=2))
+        
+        self.prev_player_pos = pygame.Vector2(self.player.x, self.player.y)
+        
+        # スクリーンシェイクを減衰
+        self.shake_intensity *= 0.9
 
         # 天井との当たり判定（上下方向）
         ceil_y = self.ceiling.get_ceiling_y(self.player.x)
@@ -329,6 +378,13 @@ class AppMain:
             if self.player.y - self.player.radius < ceiling_bottom:
                 self.player.y = ceiling_bottom + self.player.radius
                 if self.player.vy < 0:
+                    # 天井に衝突した時のエフェクト
+                    impact_strength = abs(self.player.vy)
+                    for i in range(int(impact_strength * 3)):
+                        vel = pygame.Vector2(random.uniform(-2, 2), random.uniform(-3, 0))
+                        self.effects.append(Spark(pygame.Vector2(self.player.x, ceiling_bottom), vel, 
+                                                life=random.randint(10, 25), color=(150, 100, 50), size=2))
+                    self.shake_intensity = max(self.shake_intensity, impact_strength * 0.5)
                     self.player.vy = 0
 
         # 天井との当たり判定（左右方向）
@@ -338,12 +394,26 @@ class AppMain:
             if side == 'left':
                 # 右側から衝突
                 self.player.x = rect.left - self.player.radius
+                impact_strength = abs(self.player.vx)
                 if self.player.vx < 0:
+                    # 左側の壁に衝突したエフェクト
+                    for i in range(int(impact_strength * 2)):
+                        vel = pygame.Vector2(random.uniform(-1, 2), random.uniform(-2, 2))
+                        self.effects.append(Spark(pygame.Vector2(rect.left, self.player.y), vel,
+                                                life=random.randint(10, 20), color=(150, 100, 50), size=2))
+                    self.shake_intensity = max(self.shake_intensity, impact_strength * 0.3)
                     self.player.vx = 0
             elif side == 'right':
                 # 左側から衝突
                 self.player.x = rect.right + self.player.radius
+                impact_strength = abs(self.player.vx)
                 if self.player.vx > 0:
+                    # 右側の壁に衝突したエフェクト
+                    for i in range(int(impact_strength * 2)):
+                        vel = pygame.Vector2(random.uniform(-2, 1), random.uniform(-2, 2))
+                        self.effects.append(Spark(pygame.Vector2(rect.right, self.player.y), vel,
+                                                life=random.randint(10, 20), color=(150, 100, 50), size=2))
+                    self.shake_intensity = max(self.shake_intensity, impact_strength * 0.3)
                     self.player.vx = 0
 
         # エフェクト更新
@@ -379,6 +449,10 @@ class AppMain:
             self.state = "GOAL"
 
     def draw(self):
+        # スクリーンシェイク（画面揺らし）
+        shake_x = random.uniform(-self.shake_intensity, self.shake_intensity) if self.shake_intensity > 0.1 else 0
+        shake_y = random.uniform(-self.shake_intensity, self.shake_intensity) if self.shake_intensity > 0.1 else 0
+        
         # グラデーション風の空背景
         for i in range(self.world.height):
             t = i / self.world.height
@@ -389,18 +463,21 @@ class AppMain:
 
         # パララックスクラウド
         for c in self.clouds:
-            cx = c.x - self.scroll_x * 0.3
+            cx = c.x - (self.scroll_x - shake_x) * 0.3
             cy = c.y
             pygame.draw.ellipse(self.screen, (255, 255, 255), (cx % (self.world.width + 200) - 100, cy, 140, 60))
 
-        self.ceiling.draw(self.screen, self.scroll_x)
-        self.spikes.draw(self.screen, self.scroll_x)
+        # 有効なスクロール値（シェイク適用）
+        effective_scroll = self.scroll_x - shake_x
+        
+        self.ceiling.draw(self.screen, effective_scroll)
+        self.spikes.draw(self.screen, effective_scroll)
 
         #ゴールラインの描画
         # ゴールを点滅させて目立たせる
         glow = (math.sin(pygame.time.get_ticks() * 0.005) + 1) / 2
         goal_color = (int(255 * (0.6 + 0.4 * glow)), int(215 * (0.6 + 0.4 * glow)), 0)
-        goal_rect = pygame.Rect(GOAL_X - self.scroll_x, 0, 50, self.world.height)
+        goal_rect = pygame.Rect(GOAL_X - effective_scroll, 0, 50, self.world.height)
         pygame.draw.rect(self.screen, goal_color, goal_rect)
 
         #ガイド線(プレイ中でロープを出していない時だけ表示する)
@@ -409,13 +486,13 @@ class AppMain:
             target_x = self.get_rope_target()
             ceil_y = self.ceiling.get_ceiling_y(target_x)
 
-            start_pos = (self.player.x - self.scroll_x, self.player.y)
+            start_pos = (self.player.x - effective_scroll, self.player.y)
             
             #発射可能なら水色、無理なら赤でガイド線を表示する
             if ceil_y is not None and ceil_y < self.player.y:
                 #発射可能
                 color = (0, 255, 255)
-                end_pos = (target_x - self.scroll_x, ceil_y)
+                end_pos = (target_x - effective_scroll, ceil_y)
             else:
                 #発射が無理だったら、100pxだけ表示
                 color = (255, 0, 0)
@@ -423,19 +500,19 @@ class AppMain:
                 aim_vec = pygame.Vector2(0, -1).rotate(ROPE_ANGLE)
                 end_vec = start_vec + aim_vec * 100
 
-                start_pos = (self.player.x - self.scroll_x, self.player.y)
-                end_pos = (end_vec.x - self.scroll_x, end_vec.y)
+                start_pos = (self.player.x - effective_scroll, self.player.y)
+                end_pos = (end_vec.x - effective_scroll, end_vec.y)
             
             pygame.draw.line(self.screen, color, start_pos, end_pos, 2)
 
         #プレイヤーとロープを表示
         if self.rope:
-            self.rope.draw(self.screen, self.scroll_x)
-        self.player.draw(self.screen, self.scroll_x)
+            self.rope.draw(self.screen, effective_scroll)
+        self.player.draw(self.screen, effective_scroll)
 
         # エフェクト描画
         for e in self.effects:
-            e.draw(self.screen, self.scroll_x)
+            e.draw(self.screen, effective_scroll)
 
         #スコアやメッセージを表示
         score_text = self.font.render(f"DIST: {self.score} / {GOAL_X}", True, (255, 255, 255))
