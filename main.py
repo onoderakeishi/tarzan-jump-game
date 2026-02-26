@@ -70,15 +70,18 @@ class Particle:
         # 速度に応じた色の変化
         speed = self.vel.length()
         color_intensity = int(min(255, 150 + speed * 10))
-        player_color = (255, 204, min(153 + speed * 5, 255))
+        player_color = (255, 220, 100 + int(speed * 5))
         
-        # プレイヤーを描画（グロー効果）
-        pygame.draw.circle(screen, (color_intensity // 2, color_intensity // 3, color_intensity // 4), (draw_x, draw_y), self.radius + 2)
+        # プレイヤーを描画（複数層のグロー効果）
+        pygame.draw.circle(screen, (255, 200, 60), (draw_x, draw_y), self.radius + 4, 1)
+        pygame.draw.circle(screen, (255, 160, 0), (draw_x, draw_y), self.radius + 2)
         pygame.draw.circle(screen, player_color, (draw_x, draw_y), self.radius)
+        pygame.draw.circle(screen, (255, 255, 200), (draw_x, draw_y), self.radius - 2)
         
-        #目をつけて、速度の正負によって向きをわかりやすくした
-        eye_offset = 5 if self.vx >= 0 else -5
-        pygame.draw.circle(screen, (0, 0, 0), (draw_x + eye_offset, draw_y - 4), 3)
+        # 目と口をつけて、表情を豊かに
+        eye_offset = 6 if self.vx >= 0 else -6
+        pygame.draw.circle(screen, (0, 0, 0), (draw_x + eye_offset, draw_y - 4), 2)
+        pygame.draw.circle(screen, (255, 255, 255), (draw_x + eye_offset + 1, draw_y - 5), 1)
 
 
 class Spark:
@@ -90,21 +93,43 @@ class Spark:
         self.max_life = life
         self.color = color
         self.size = size
+        self.rotation = random.uniform(0, 360)
+        self.rotation_speed = random.uniform(-10, 10)
 
     def update(self):
         # 軽い重力と減速
-        self.vel += pygame.Vector2(0, 0.15)
+        self.vel += pygame.Vector2(0, 0.1) * (self.max_life / 30)  # 重力を柔軟に
+        self.vel *= 0.98  # 空気抵抗
         self.pos += self.vel
         self.life -= 1
+        self.rotation += self.rotation_speed
 
     def draw(self, screen, scroll_x):
         if self.life <= 0:
             return
         alpha = int(255 * (self.life / max(1, self.max_life)))
-        s = pygame.Surface((self.size, self.size), pygame.SRCALPHA)
-        color_with_alpha = (*self.color, alpha)
-        s.fill(color_with_alpha)
-        screen.blit(s, (int(self.pos.x - scroll_x), int(self.pos.y)))
+        progress = 1 - (self.life / max(1, self.max_life))
+        
+        # サイズが時間とともに変わる
+        current_size = int(self.size * (1 + progress * 0.5))
+        
+        # 複数の円で立体感を出す
+        s = pygame.Surface((current_size * 3, current_size * 3), pygame.SRCALPHA)
+        
+        # グロー層
+        r, g, b = self.color
+        glow_alpha = int(alpha * 0.3)
+        glow_color = (r, g, b, glow_alpha)
+        pygame.draw.circle(s, glow_color, (current_size + 1, current_size + 1), current_size + 2)
+        
+        # メイン層
+        pygame.draw.circle(s, (r, g, b, alpha), (current_size + 1, current_size + 1), current_size)
+        
+        # ハイライト層
+        highlight_color = (min(255, r + 50), min(255, g + 50), min(255, b + 50), alpha)
+        pygame.draw.circle(s, highlight_color, (current_size + 1, current_size), current_size - 1)
+        
+        screen.blit(s, (int(self.pos.x - scroll_x - current_size - 1), int(self.pos.y - current_size - 1)))
 
 
 class Rope:
@@ -145,13 +170,23 @@ class Rope:
         start = (int(self.anchor.x - scroll_x), int(self.anchor.y))
         end = (int(self.player.x - scroll_x), int(self.player.y))
         
-        # ロープを太く描画（グロー効果）
+        # ロープを複数層で描画（美しいグロー効果）
         intensity = int(self.glow_intensity * 255)
-        glow_color = (34 + intensity // 3, 139 + intensity // 4, 34 + intensity // 5)
-        pygame.draw.line(screen, glow_color, start, end, 5)
         
-        # ロープのコア
-        pygame.draw.line(screen, (34, 139, 34), start, end, 3)
+        # 外側のグロー（目立つ色）
+        glow_outer = (100 + intensity // 4, 200 + intensity // 5, 100)
+        pygame.draw.line(screen, glow_outer, start, end, 8)
+        
+        # 中間層
+        glow_mid = (50 + intensity // 3, 150 + intensity // 4, 50)
+        pygame.draw.line(screen, glow_mid, start, end, 5)
+        
+        # ロープのコア（明るい色）
+        rope_core = (100, 200, 100)
+        pygame.draw.line(screen, rope_core, start, end, 3)
+        
+        # ハイライト
+        pygame.draw.line(screen, (200, 255, 200), start, end, 1)
 
 
 class CeilingMap:
@@ -199,7 +234,27 @@ class CeilingMap:
             if rect.left - scroll_x > self.world.width:
                 continue
             draw_rect = pygame.Rect(rect.x - scroll_x, rect.y, rect.width, rect.height)
-            pygame.draw.rect(screen, (139, 69, 19), draw_rect) #茶色
+            
+            # グラデーション風の茶色シェーディング
+            base_color = (120, 60, 20)
+            highlight_color = (160, 90, 30)
+            shadow_color = (80, 40, 10)
+            
+            # メイン色
+            pygame.draw.rect(screen, base_color, draw_rect)
+            
+            # ハイライト（上辺）
+            pygame.draw.line(screen, highlight_color, 
+                           (draw_rect.left, draw_rect.top), 
+                           (draw_rect.right, draw_rect.top), 2)
+            
+            # シャドウ（下辺）
+            pygame.draw.line(screen, shadow_color, 
+                           (draw_rect.left, draw_rect.bottom - 1), 
+                           (draw_rect.right, draw_rect.bottom - 1), 2)
+            
+            # 枠線を追加して立体感を出す
+            pygame.draw.rect(screen, shadow_color, draw_rect, 1)
 
 
 class SpikeFloor:
@@ -220,13 +275,22 @@ class SpikeFloor:
         start_i = int(scroll_x / spike_w)       #描き始めるのは何番目のトゲからか?
         end_i = start_i + int(self.world.width / spike_w) + 2       #何番目のトゲまで描けばいいか?(予備で2個追加)
 
+        # 床の背景
+        pygame.draw.rect(screen, (20, 80, 20), (0, self.y, self.world.width, self.world.height - self.y))
+        
         for i in range(start_i, end_i):
             base_x = i * spike_w - scroll_x     #ゲーム世界の絶対値座標-カメラ位置
-            #ギザギザの三角形
+            #ギザギザの三角形（濃い緑）
             p1 = (base_x, self.world.height)
             p2 = (base_x + spike_w/2, self.y)       #トゲの先端
             p3 = (base_x + spike_w, self.world.height)
-            pygame.draw.polygon(screen, (0, 100, 0), [p1, p2, p3])
+            
+            # メイン色
+            pygame.draw.polygon(screen, (0, 120, 0), [p1, p2, p3])
+            
+            # グロー効果（外枠）
+            pygame.draw.line(screen, (100, 200, 100), p1, p2, 1)
+            pygame.draw.line(screen, (100, 200, 100), p2, p3, 1)
 
 
 class AppMain:
@@ -453,19 +517,42 @@ class AppMain:
         shake_x = random.uniform(-self.shake_intensity, self.shake_intensity) if self.shake_intensity > 0.1 else 0
         shake_y = random.uniform(-self.shake_intensity, self.shake_intensity) if self.shake_intensity > 0.1 else 0
         
-        # グラデーション風の空背景
+        # グラデーション風の空背景（より鮮やかに）
         for i in range(self.world.height):
             t = i / self.world.height
-            r = int(135 * (1 - t) + 25 * t)
-            g = int(206 * (1 - t) + 25 * t)
-            b = int(235 * (1 - t) + 112 * t)
+            r = int(100 * (1 - t) + 50 * t)
+            g = int(180 * (1 - t) + 100 * t)
+            b = int(255 * (1 - t) + 140 * t)
             pygame.draw.line(self.screen, (r, g, b), (0, i), (self.world.width, i))
+        
+        # 遠景の山々（視差効果）
+        for i, c in enumerate(self.clouds):
+            mountain_y = 100 + i * 30
+            mountain_height = 50 + i * 10
+            mountain_x = c.x - (self.scroll_x - shake_x) * 0.15
+            mountain_color = (int(100 + 20 * i), int(150 + 20 * i), int(120 + 20 * i))
+            # 山の形状を簡単に
+            points = [
+                (int(mountain_x - 100), self.world.height),
+                (int(mountain_x), int(mountain_y - mountain_height)),
+                (int(mountain_x + 100), self.world.height)
+            ]
+            pygame.draw.polygon(self.screen, mountain_color, points)
 
-        # パララックスクラウド
-        for c in self.clouds:
+        # パララックスクラウド（より美しく）
+        for i, c in enumerate(self.clouds):
             cx = c.x - (self.scroll_x - shake_x) * 0.3
             cy = c.y
-            pygame.draw.ellipse(self.screen, (255, 255, 255), (cx % (self.world.width + 200) - 100, cy, 140, 60))
+            
+            # 複数の円でクラウド形状を作成
+            cloud_x = cx % (self.world.width + 200) - 100
+            
+            # クラウドのグロー
+            pygame.draw.ellipse(self.screen, (200, 200, 200), (cloud_x - 10, cy - 10, 160, 80))
+            # メインクラウド
+            pygame.draw.ellipse(self.screen, (255, 255, 255), (cloud_x, cy, 140, 60))
+            # ハイライト
+            pygame.draw.arc(self.screen, (200, 220, 255), (cloud_x + 10, cy - 20, 120, 50), 1, 2, 2)
 
         # 有効なスクロール値（シェイク適用）
         effective_scroll = self.scroll_x - shake_x
@@ -514,41 +601,106 @@ class AppMain:
         for e in self.effects:
             e.draw(self.screen, effective_scroll)
 
-        #スコアやメッセージを表示
-        score_text = self.font.render(f"DIST: {self.score} / {GOAL_X}", True, (255, 255, 255))
+        # HUD背景（半透明）
+        hud_surface = pygame.Surface((self.world.width, 100), pygame.SRCALPHA)
+        pygame.draw.rect(hud_surface, (0, 0, 0, 100), (0, 0, self.world.width, 100))
+        self.screen.blit(hud_surface, (0, 0))
+        
+        # スコア表示（より大きく目立つ）
+        score_text = self.font.render(f"DISTANCE: {self.score}", True, (100, 255, 100))
+        score_shadow = self.font.render(f"DISTANCE: {self.score}", True, (0, 0, 0))
+        self.screen.blit(score_shadow, (22, 22))
         self.screen.blit(score_text, (20, 20))
         
-        #タイマー表示（残り時間が少ないと赤くなる）
-        time_color = (255, 255, 255) if self.time_remaining > 10 else (255, 100, 100)
+        # ゴールまでの距離を表示
+        remaining = max(0, GOAL_X - self.score)
+        remaining_pct = max(0, min(100, (1 - self.score / GOAL_X) * 100))
+        goal_text = self.font_small.render(f"Goal: {remaining} ({int(remaining_pct)}%)", True, (200, 200, 100))
+        self.screen.blit(goal_text, (20, 70))
+        
+        # タイマー表示（残り時間が少ないと赤くなる）
+        time_color = (100, 255, 100) if self.time_remaining > 10 else (255, 100, 100)
         time_text = self.font.render(f"TIME: {max(0, int(self.time_remaining))}", True, time_color)
+        time_shadow = self.font.render(f"TIME: {max(0, int(self.time_remaining))}", True, (0, 0, 0))
+        self.screen.blit(time_shadow, (self.world.width - 222, 22))
         self.screen.blit(time_text, (self.world.width - 220, 20))
 
-        # 進捗バー
+        # 進捗バー（より美しく）
         bar_w = 300
-        bar_h = 16
+        bar_h = 20
         bar_x = 20
-        bar_y = 20 + 60
+        bar_y = 20 + 100
         ratio = max(0.0, min(1.0, self.player.x / max(1, GOAL_X)))
+        
+        # バーの背景（グラデーション風）
+        pygame.draw.rect(self.screen, (30, 30, 30), (bar_x - 2, bar_y - 2, bar_w + 4, bar_h + 4))
         pygame.draw.rect(self.screen, (50, 50, 50), (bar_x, bar_y, bar_w, bar_h))
-        pygame.draw.rect(self.screen, (50, 205, 50), (bar_x, bar_y, int(bar_w * ratio), bar_h))
-        pygame.draw.rect(self.screen, (255, 255, 255), (bar_x, bar_y, bar_w, bar_h), 2)
+        
+        # バー（グロー付き）
+        bar_fill_w = int(bar_w * ratio)
+        if bar_fill_w > 0:
+            pygame.draw.rect(self.screen, (100, 255, 100), (bar_x - 1, bar_y - 1, bar_fill_w + 2, bar_h + 2))
+            pygame.draw.rect(self.screen, (100, 200, 100), (bar_x, bar_y, bar_fill_w, bar_h))
+        
+        # バーの枠線
+        pygame.draw.rect(self.screen, (200, 255, 200), (bar_x, bar_y, bar_w, bar_h), 2)
 
-        # FPS 表示（小さなフォント）
-        fps_text = self.font_small.render(f"FPS: {int(self.clock.get_fps())}", True, (255, 255, 255))
-        self.screen.blit(fps_text, (self.world.width - 100, 10))
+        # FPS 表示（小さなフォント、角に配置）
+        fps_text = self.font_small.render(f"FPS: {int(self.clock.get_fps())}", True, (200, 200, 200))
+        self.screen.blit(fps_text, (self.world.width - 120, self.world.height - 25))
 
-        #状態ごとのメッセージ表示
+        # 状態ごとのメッセージ表示（オーバーレイ背景付き）
         if self.state == "READY":
-            msg = self.font.render("CLICK TO START", True, (0, 100, 0))
+            # 半透明の背景
+            overlay = pygame.Surface((self.world.width, self.world.height), pygame.SRCALPHA)
+            pygame.draw.rect(overlay, (0, 0, 0, 150), (0, 0, self.world.width, self.world.height))
+            self.screen.blit(overlay, (0, 0))
+            
+            msg = self.font.render("CLICK TO START", True, (100, 255, 100))
+            msg_shadow = self.font.render("CLICK TO START", True, (0, 100, 0))
+            self.screen.blit(msg_shadow, (self.world.width/2 - 202, self.world.height/2 + 2))
             self.screen.blit(msg, (self.world.width/2 - 200, self.world.height/2))
+            
+            # サブテキスト
+            sub_text = self.font_small.render("Swing from ceiling to ceiling and reach the goal!", True, (200, 200, 200))
+            self.screen.blit(sub_text, (self.world.width/2 - 200, self.world.height/2 + 70))
 
         elif self.state == "GAMEOVER":
-            msg = self.font.render("GAME OVER", True, (255, 0, 0))
+            # 半透明の背景
+            overlay = pygame.Surface((self.world.width, self.world.height), pygame.SRCALPHA)
+            pygame.draw.rect(overlay, (0, 0, 0, 150), (0, 0, self.world.width, self.world.height))
+            self.screen.blit(overlay, (0, 0))
+            
+            msg = self.font.render("GAME OVER", True, (255, 100, 100))
+            msg_shadow = self.font.render("GAME OVER", True, (100, 0, 0))
+            self.screen.blit(msg_shadow, (self.world.width/2 - 132, self.world.height/2 + 2))
             self.screen.blit(msg, (self.world.width/2 - 130, self.world.height/2))
             
+            # スコア表示
+            score_msg = self.font_small.render(f"Distance: {self.score}m", True, (200, 200, 200))
+            self.screen.blit(score_msg, (self.world.width/2 - 80, self.world.height/2 + 70))
+            
+            retry_msg = self.font_small.render("Click to retry", True, (150, 150, 255))
+            self.screen.blit(retry_msg, (self.world.width/2 - 70, self.world.height/2 + 110))
+            
         elif self.state == "GOAL":
-            msg = self.font.render("GOAL!!", True, (255, 215, 0))
+            # 半透明の背景
+            overlay = pygame.Surface((self.world.width, self.world.height), pygame.SRCALPHA)
+            pygame.draw.rect(overlay, (0, 0, 0, 150), (0, 0, self.world.width, self.world.height))
+            self.screen.blit(overlay, (0, 0))
+            
+            msg = self.font.render("GOAL!!", True, (255, 255, 100))
+            msg_shadow = self.font.render("GOAL!!", True, (200, 150, 0))
+            self.screen.blit(msg_shadow, (self.world.width/2 - 82, self.world.height/2 + 2))
             self.screen.blit(msg, (self.world.width/2 - 80, self.world.height/2))
+            
+            # 最終スコア
+            score_msg = self.font_small.render(f"Distance: {self.score}m", True, (200, 255, 200))
+            self.screen.blit(score_msg, (self.world.width/2 - 80, self.world.height/2 + 70))
+            
+            retry_msg = self.font_small.render("Click to play again", True, (255, 200, 100))
+            self.screen.blit(retry_msg, (self.world.width/2 - 100, self.world.height/2 + 110))
+        
         pygame.display.update()
 
     def run(self):
