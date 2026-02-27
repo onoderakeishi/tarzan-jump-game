@@ -530,7 +530,7 @@ class AppMain:
             mountain_y = 100 + i * 30
             mountain_height = 50 + i * 10
             mountain_x = c.x - (self.scroll_x - shake_x) * 0.15
-            mountain_color = (int(100 + 20 * i), int(150 + 20 * i), int(120 + 20 * i))
+            mountain_color = (min(255, int(100 + 20 * i)), min(255, int(150 + 20 * i)), min(255, int(120 + 20 * i)))
             # 山の形状を簡単に
             points = [
                 (int(mountain_x - 100), self.world.height),
