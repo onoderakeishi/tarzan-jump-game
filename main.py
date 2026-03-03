@@ -9,8 +9,8 @@ ROPE_ANGLE = 50        #ロープ発射角度
 KICK_STRENGTH = 2.2    #ブーストの強さ（爽快感アップ）
 GOAL_X = 15000        #ゴール地点のX座標
 TIME_LIMIT = 60        #制限時間（秒）
-GRAVITY = 0.2          #重力（小さめでふわっと）
-AIR_DRAG = 1.0         #空気抵抗（1.0に近いほど減速しない）
+GRAVITY = 0.08         #重力（小さめでふわっと）
+AIR_DRAG = 0.94        #空気抵抗（1.0に近いほど減速しない）
 
 #クラス定義
 class World:
